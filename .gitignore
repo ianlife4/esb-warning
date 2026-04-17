@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+debug_*.png
+update_log.txt
+server.py
+auto_update.bat
+merge_new_data.py
+update.py

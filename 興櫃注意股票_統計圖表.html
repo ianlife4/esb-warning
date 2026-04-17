@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>興櫃注意股票 - 產業分析統計圖表</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: #f0f2f5; color: #333; }
+.header { background: linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%); color: white; padding: 30px 40px; }
+.header h1 { font-size: 28px; margin-bottom: 8px; }
+.header p { font-size: 14px; opacity: 0.85; }
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; }
+.stat-card .number { font-size: 36px; font-weight: 700; color: #1a365d; }
+.stat-card .label { font-size: 13px; color: #666; margin-top: 4px; }
+.chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
+.chart-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.chart-card.full { grid-column: 1 / -1; }
+.chart-card h3 { font-size: 16px; color: #1a365d; margin-bottom: 16px; border-left: 4px solid #2b6cb0; padding-left: 12px; }
+.chart-wrap { position: relative; width: 100%; }
+.chart-wrap canvas { width: 100% !important; }
+.tab-container { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab-btn { padding: 6px 16px; border: 1px solid #d0d5dd; border-radius: 20px; background: white; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+.tab-btn.active { background: #1a365d; color: white; border-color: #1a365d; }
+.tab-btn:hover { background: #e2e8f0; }
+.tab-btn.active:hover { background: #2d4a7a; }
+.insight-box { background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin-top: 12px; font-size: 13px; line-height: 1.6; }
+.insight-box strong { color: #92400e; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #1a365d; color: white; padding: 10px 12px; text-align: center; }
+td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+tr:hover { background: #f7fafc; }
+.bar-cell { position: relative; text-align: left; }
+.bar-bg { position: absolute; left: 0; top: 2px; bottom: 2px; background: #bee3f8; border-radius: 4px; z-index: 0; }
+.bar-text { position: relative; z-index: 1; padding-left: 8px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>興櫃注意股票 - 產業分析統計圖表</h1>
+  <p>資料期間：民國110年1月 ~ 115年4月 | 共 1,682 筆注意交易紀錄 | 426 檔不重複股票</p>
+</div>
+<div class="container">
+  <div class="stats-row">
+    <div class="stat-card"><div class="number">1,682</div><div class="label">總注意交易筆數</div></div>
+    <div class="stat-card"><div class="number">426</div><div class="label">不重複股票數</div></div>
+    <div class="stat-card"><div class="number">28</div><div class="label">涵蓋產業數</div></div>
+    <div class="stat-card"><div class="number">85.5%</div><div class="label">產業分類覆蓋率</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <!-- Chart 1: Industry Distribution -->
+    <div class="chart-card">
+      <h3>各產業觸發注意交易次數</h3>
+      <div class="chart-wrap"><canvas id="chart1" height="320"></canvas></div>
+    </div>
+
+    <!-- Chart 2: Condition Distribution -->
+    <div class="chart-card">
+      <h3>觸發條款分布</h3>
+      <div class="chart-wrap"><canvas id="chart2" height="320"></canvas></div>
+      <div class="insight-box">
+        <strong>條款說明：</strong><br>
+        第一款：當日交易時間內加權平均成交價振幅達20%<br>
+        第二款：最近5個營業日累積漲幅達一定標準<br>
+        第三款：最近5個營業日累積漲/跌幅達一定標準，且當日加權平均成交價達門檻<br>
+        第四款：最近30個營業日起迄漲幅達100%以上
+      </div>
+    </div>
+
+    <!-- Chart 3: Direction Distribution -->
+    <div class="chart-card">
+      <h3>漲跌方向分布</h3>
+      <div class="chart-wrap"><canvas id="chart3" height="300"></canvas></div>
+    </div>
+
+    <!-- Chart 4: Industry Amplitude -->
+    <div class="chart-card">
+      <h3>各產業平均觸發幅度比較</h3>
+      <div class="chart-wrap"><canvas id="chart4" height="300"></canvas></div>
+    </div>
+
+    <!-- Chart 5: Year Trend -->
+    <div class="chart-card full">
+      <h3>各年度注意交易觸發次數趨勢（依產業）</h3>
+      <div class="tab-container" id="yearTabs"></div>
+      <div class="chart-wrap"><canvas id="chart5" height="350"></canvas></div>
+      <div class="insight-box">
+        <strong>趨勢觀察：</strong>
+        2021年（民國110年）為觸發高峰，生技醫療業與半導體業佔大宗。2022年大幅降溫。2025-2026年半導體業與光電業觸發次數明顯回升，反映市場對AI及先進製程題材的熱度。
+      </div>
+    </div>
+
+    <!-- Chart 6: Heatmap Table -->
+    <div class="chart-card full">
+      <h3>產業 × 條款交叉分析（熱力表）</h3>
+      <div id="heatmapTable"></div>
+      <div class="insight-box">
+        <strong>分析重點：</strong>
+        生技醫療業以第一款（振幅）和第四款（30日漲幅）觸發為主，顯示該產業容易出現短期劇烈波動及中期持續上漲。半導體業四項條款觸發較均勻。電子零組件業第四款觸發比例最高，反映中長期趨勢性上漲特徵。
+      </div>
+    </div>
+
+    <!-- Chart 7: Top stocks table -->
+    <div class="chart-card full">
+      <h3>個股進入注意股票次數 TOP 20</h3>
+      <div id="topStocksTable"></div>
+    </div>
+
+    <!-- DISPOSAL SECTION -->
+    <div style="margin:32px 0 16px;border-top:3px solid #e53e3e;padding-top:24px">
+      <h2 style="font-size:24px;color:#e53e3e;margin-bottom:4px">興櫃處置股票分析</h2>
+      <p style="color:#666;font-size:14px">資料期間：民國109年~115年 | 共 69 筆處置紀錄 | 46 檔不重複股票</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card" style="border-top:3px solid #e53e3e"><div class="number" style="color:#e53e3e">69</div><div class="label">總處置筆數</div></div>
+      <div class="stat-card" style="border-top:3px solid #e53e3e"><div class="number" style="color:#e53e3e">46</div><div class="label">不重複被處置股票</div></div>
+      <div class="stat-card" style="border-top:3px solid #dd6b20"><div class="number" style="color:#dd6b20">43.1%</div><div class="label">最常見：第四款（30日漲幅）</div></div>
+      <div class="stat-card" style="border-top:3px solid #dd6b20"><div class="number" style="color:#dd6b20">50%</div><div class="label">最高處置率：化學工業</div></div>
+    </div>
+
+    <!-- Chart 8: Disposal condition distribution -->
+    <div class="chart-card">
+      <h3 style="border-color:#e53e3e">進入處置前最常觸發的注意交易條款</h3>
+      <div class="chart-wrap"><canvas id="chart8" height="300"></canvas></div>
+      <div class="insight-box" style="background:#fff5f5;border-color:#e53e3e">
+        <strong style="color:#9b2c2c">核心發現：</strong>
+        第四款（30日漲幅達100%以上）是最容易導致處置的條款，佔43.1%。代表中長期持續飆漲的股票最容易被櫃買中心處置。「6日內4日」處置原因中，第四款更佔近60%。
+      </div>
+    </div>
+
+    <!-- Chart 9: Disposal by reason x condition -->
+    <div class="chart-card">
+      <h3 style="border-color:#e53e3e">處置原因 × 觸發條款差異</h3>
+      <div class="chart-wrap"><canvas id="chart9" height="300"></canvas></div>
+      <div class="insight-box" style="background:#fff5f5;border-color:#e53e3e">
+        <strong style="color:#9b2c2c">差異分析：</strong>
+        「連續3日」處置：四款條款分布較均勻，第二款（5日漲幅）略多。<br>
+        「6日內4日」處置：集中在第四款（30日漲幅），佔近60%，代表這類處置多發生在持續飆漲的股票上。
+      </div>
+    </div>
+
+    <!-- Chart 10: Industry disposal rate -->
+    <div class="chart-card full">
+      <h3 style="border-color:#e53e3e">各產業 注意→處置 轉換率</h3>
+      <div class="chart-wrap"><canvas id="chart10" height="350"></canvas></div>
+      <div class="insight-box" style="background:#fff5f5;border-color:#e53e3e">
+        <strong style="color:#9b2c2c">轉換率觀察：</strong>
+        化學工業處置率最高（50%），其次是通信網路業（25%）、航運業（20%）。生技醫療業雖然注意次數最多，但處置率僅9%，代表多數生技股只是短期波動，不會持續到被處置的程度。
+      </div>
+    </div>
+
+    <!-- Chart 11: Top disposed stocks -->
+    <div class="chart-card full">
+      <h3 style="border-color:#e53e3e">最常被處置的個股</h3>
+      <div id="disposalStocksTable"></div>
+    </div>
+
+    <!-- PRICE GAIN SECTION -->
+    <div style="margin:32px 0 16px;border-top:3px solid #38a169;padding-top:24px">
+      <h2 style="font-size:24px;color:#38a169;margin-bottom:4px">條款 → 後續漲幅分析</h2>
+      <p style="color:#666;font-size:14px">追蹤個股首次進入注意名單後的價格變化，找出最有漲幅潛力的條款</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card" style="border-top:3px solid #38a169"><div class="number" style="color:#38a169">第二款</div><div class="label">最佳條款：平均漲幅 255%</div></div>
+      <div class="stat-card" style="border-top:3px solid #38a169"><div class="number" style="color:#38a169">97.2%</div><div class="label">第二款正報酬比例</div></div>
+      <div class="stat-card" style="border-top:3px solid #2b6cb0"><div class="number" style="color:#2b6cb0">68.9%</div><div class="label">整體上漲比例（多次出現股）</div></div>
+      <div class="stat-card" style="border-top:3px solid #2b6cb0"><div class="number" style="color:#2b6cb0">87.6%</div><div class="label">整體平均首→末漲幅</div></div>
+    </div>
+
+    <!-- Chart 12: Condition → Gain bar -->
+    <div class="chart-card">
+      <h3 style="border-color:#38a169">首次觸發條款 → 後續預期報酬</h3>
+      <div class="chart-wrap"><canvas id="chart12" height="320"></canvas></div>
+      <div class="insight-box" style="background:#f0fff4;border-color:#38a169">
+        <strong style="color:#22543d">核心發現：</strong>
+        第二款（5日漲幅達標準）是最佳信號，首次觸發後平均後續最高漲幅達 255%，正報酬比例 97.2%。第一款（振幅）樣本最多且穩定，中位數漲幅 53.6%，超過半數個股後續漲幅>50%。第四款（30日漲幅）雖然正報酬比例100%，但漲幅空間相對較小，因為進場時已漲了很多。
+      </div>
+    </div>
+
+    <!-- Chart 13: Success rate comparison -->
+    <div class="chart-card">
+      <h3 style="border-color:#38a169">各條款漲幅成功率比較</h3>
+      <div class="chart-wrap"><canvas id="chart13" height="320"></canvas></div>
+      <div class="insight-box" style="background:#f0fff4;border-color:#38a169">
+        <strong style="color:#22543d">操作建議：</strong>
+        若看到某檔興櫃股首次因第二款（5日漲幅）進入注意名單，後續繼續上漲的機率極高。第一款（振幅）則是最常見的起手信號，有超過八成機率正報酬，超過五成機率漲超50%。
+      </div>
+    </div>
+
+    <!-- Chart 14: Top gainers table -->
+    <div class="chart-card full">
+      <h3 style="border-color:#38a169">首次進入注意後漲幅最大 TOP 15</h3>
+      <div id="topGainersTable"></div>
+    </div>
+
+    <!-- T+5 RETURN ANALYSIS SECTION -->
+    <div style="margin:32px 0 16px;border-top:3px solid #805ad5;padding-top:24px">
+      <h2 style="font-size:24px;color:#805ad5;margin-bottom:4px">T+5 短期報酬分析</h2>
+      <p style="color:#666;font-size:14px">每次觸發注意交易後約5個交易日的漲跌幅統計 | 共 869 組配對樣本</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card" style="border-top:3px solid #805ad5"><div class="number" style="color:#805ad5">869</div><div class="label">T+5 配對樣本數</div></div>
+      <div class="stat-card" style="border-top:3px solid #805ad5"><div class="number" style="color:#805ad5">67.1%</div><div class="label">整體 T+5 勝率</div></div>
+      <div class="stat-card" style="border-top:3px solid #38a169"><div class="number" style="color:#38a169">+9.96%</div><div class="label">平均 T+5 報酬</div></div>
+      <div class="stat-card" style="border-top:3px solid #38a169"><div class="number" style="color:#38a169">+5.97%</div><div class="label">中位數 T+5 報酬</div></div>
+    </div>
+
+    <!-- Chart T1: T+5 by condition bar -->
+    <div class="chart-card">
+      <h3 style="border-color:#805ad5">各條款 T+5 平均報酬 & 勝率</h3>
+      <div class="chart-wrap"><canvas id="chartT1" height="320"></canvas></div>
+      <div class="insight-box" style="background:#faf5ff;border-color:#805ad5">
+        <strong style="color:#553c9a">核心發現：</strong>
+        第一款（振幅）T+5 平均報酬最高達 +18.2%，勝率 72%。第三款（5日+成交價）勝率最高達 79%，但樣本較少。第四款（30日漲幅）雖然觸發最多，但 T+5 報酬最低（+6.3%），因為進場時已大幅上漲。
+      </div>
+    </div>
+
+    <!-- Chart T2: T+5 condition+direction combo -->
+    <div class="chart-card">
+      <h3 style="border-color:#805ad5">條款×方向組合 T+5 勝率排行</h3>
+      <div class="chart-wrap"><canvas id="chartT2" height="320"></canvas></div>
+      <div class="insight-box" style="background:#faf5ff;border-color:#805ad5">
+        <strong style="color:#553c9a">最佳組合：</strong>
+        第一款+振幅方向 勝率 78.7%，平均 T+5 +22.8%，>10% 機率高達 74.1%，是最穩定的短線信號。第三款+漲方向 勝率 78.3% 排名第二。跌方向的第一款和第二款勝率僅 28-32%，做多需避開。
+      </div>
+    </div>
+
+    <!-- Chart T3: T+5 Distribution histogram -->
+    <div class="chart-card full">
+      <h3 style="border-color:#805ad5">T+5 報酬分布直方圖</h3>
+      <div class="chart-wrap"><canvas id="chartT3" height="300"></canvas></div>
+    </div>
+
+    <!-- Chart T4: T+5 by industry -->
+    <div class="chart-card full">
+      <h3 style="border-color:#805ad5">各產業 T+5 報酬 & 勝率比較</h3>
+      <div class="chart-wrap"><canvas id="chartT4" height="350"></canvas></div>
+      <div class="insight-box" style="background:#faf5ff;border-color:#805ad5">
+        <strong style="color:#553c9a">產業差異：</strong>
+        電機機械 T+5 勝率最高達 95.2%，數位雲端和綠能環保平均報酬最高（>23%）。半導體業和其他電子業勝率超過 80%。生技醫療業雖然樣本最多但勝率僅 62.4%，波動大。
+      </div>
+    </div>
+
+    <!-- T5: Top T+5 combos table -->
+    <div class="chart-card full">
+      <h3 style="border-color:#805ad5">T+5 最佳操作策略排行（≥10 樣本）</h3>
+      <div id="t5StrategyTable"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#2b6cb0','#e53e3e','#38a169','#d69e2e','#805ad5','#dd6b20','#3182ce','#e53e3e','#319795','#d53f8c','#718096','#2d3748'];
+
+// Data
+const chart1Data = [{"name":"生技醫療業","value":339},{"name":"未分類","value":244},{"name":"半導體業","value":239},{"name":"光電業","value":145},{"name":"電子零組件業","value":141},{"name":"其他電子業","value":86},{"name":"數位雲端","value":86},{"name":"綠能環保","value":65},{"name":"通信網路業","value":53},{"name":"化學工業","value":52},{"name":"電機機械","value":49},{"name":"其他業","value":29},{"name":"電腦及週邊設備業","value":29},{"name":"資訊服務業","value":27},{"name":"文化創意業","value":24}];
+
+const chart2Data = [{"name":"第一款（振幅）","value":732},{"name":"第四款（30日漲幅）","value":625},{"name":"第二款（5日漲幅）","value":467},{"name":"第三款（5日+成交價）","value":180},{"name":"通知推薦","value":78}];
+
+const chart3Data = [{"name":"漲","value":940},{"name":"振幅","value":584},{"name":"跌","value":80},{"name":"其他","value":78}];
+
+const chart4Year = [{"year":"2021","生技醫療業":116,"未分類":115,"半導體業":94,"光電業":20,"電子零組件業":61,"其他電子業":10,"數位雲端":31,"綠能環保":2},{"year":"2022","生技醫療業":41,"未分類":79,"半導體業":6,"光電業":22,"電子零組件業":2,"其他電子業":2,"數位雲端":7,"綠能環保":2},{"year":"2023","生技醫療業":53,"未分類":15,"半導體業":6,"光電業":7,"電子零組件業":3,"其他電子業":4,"數位雲端":14,"綠能環保":4},{"year":"2024","生技醫療業":24,"未分類":14,"半導體業":17,"光電業":15,"電子零組件業":24,"其他電子業":22,"數位雲端":9,"綠能環保":17},{"year":"2025","生技醫療業":85,"未分類":16,"半導體業":52,"光電業":55,"電子零組件業":25,"其他電子業":22,"數位雲端":18,"綠能環保":27},{"year":"2026","生技醫療業":20,"未分類":5,"半導體業":64,"光電業":26,"電子零組件業":26,"其他電子業":26,"數位雲端":7,"綠能環保":13}];
+
+const chart6Amp = [{"name":"生技醫療業","mean":84.9,"median":62.4,"max":332.0,"min":20.0,"count":321},{"name":"未分類","mean":81.7,"median":59.1,"max":448.4,"min":20.0,"count":222},{"name":"半導體業","mean":74.1,"median":51.6,"max":354.4,"min":20.0,"count":225},{"name":"光電業","mean":101.6,"median":108.9,"max":398.7,"min":20.0,"count":141},{"name":"電子零組件業","mean":110.4,"median":76.2,"max":723.2,"min":20.0,"count":134},{"name":"其他電子業","mean":59.8,"median":36.4,"max":267.0,"min":20.0,"count":86},{"name":"數位雲端","mean":91.5,"median":35.8,"max":515.1,"min":20.0,"count":83},{"name":"綠能環保","mean":63.0,"median":31.0,"max":306.0,"min":20.0,"count":65}];
+
+const heatmapData = [{"industry":"生技醫療業","第一款（振幅）":147,"第二款（5日漲幅）":81,"第三款（5日+成交價）":21,"第四款（30日漲幅）":144},{"industry":"半導體業","第一款（振幅）":82,"第二款（5日漲幅）":54,"第三款（5日+成交價）":56,"第四款（30日漲幅）":86},{"industry":"光電業","第一款（振幅）":45,"第二款（5日漲幅）":32,"第三款（5日+成交價）":13,"第四款（30日漲幅）":86},{"industry":"電子零組件業","第一款（振幅）":51,"第二款（5日漲幅）":47,"第三款（5日+成交價）":11,"第四款（30日漲幅）":64},{"industry":"其他電子業","第一款（振幅）":35,"第二款（5日漲幅）":19,"第三款（5日+成交價）":38,"第四款（30日漲幅）":17},{"industry":"數位雲端","第一款（振幅）":45,"第二款（5日漲幅）":24,"第三款（5日+成交價）":9,"第四款（30日漲幅）":28},{"industry":"綠能環保","第一款（振幅）":46,"第二款（5日漲幅）":19,"第三款（5日+成交價）":6,"第四款（30日漲幅）":13},{"industry":"未分類","第一款（振幅）":107,"第二款（5日漲幅）":105,"第三款（5日+成交價）":5,"第四款（30日漲幅）":61}];
+
+const topStocks = [
+  ["3595","山太士","光電業",37,"2023/08/02",5728.3],
+  ["6724","創王","未分類",30,"2021/08/16",518.5],
+  ["4573","高明鐵","電機機械",26,"2024/06/07",813.7],
+  ["6550","北極星藥業-KY","生技醫療業",25,"2021/03/02",236.0],
+  ["6820","連訊","通信網路業",25,"2021/03/22",476.6],
+  ["6272","驊陞","電子零組件業",23,"2021/02/22",225.0],
+  ["7419","達勝","電子零組件業",22,"2024/05/10",1041.8],
+  ["6545","擎力","未分類",21,"2021/02/17",143.4],
+  ["4738","尚化","化學工業",21,"2021/01/28",72.0],
+  ["4925","智微","半導體業",20,"2021/02/18",149.2],
+  ["3592","瑞鼎","半導體業",20,"2021/02/01",100.5],
+  ["3678","聯享","光電業",19,"2021/03/02",1104.3],
+  ["6595","光禹國際","文化創意業",19,"2021/02/19",72.8],
+  ["6682","碩鑽材料","光電業",19,"2021/07/12",369.7],
+  ["5240","建騰","光電業",16,"2022/09/05",148.2],
+  ["6626","唯數","未分類",15,"2021/04/07",20.1],
+  ["6611","方舟","未分類",15,"2022/01/07",101.6],
+  ["5246","勵威","半導體業",15,"2022/11/03",552.0],
+  ["6699","奇邑","未分類",14,"2021/08/17",88.3],
+  ["4132","國鼎","生技醫療業",14,"2021/07/05",166.2]
+];
+
+// ===== Chart 1: Horizontal bar =====
+new Chart(document.getElementById('chart1'), {
+  type: 'bar',
+  data: {
+    labels: chart1Data.map(d => d.name),
+    datasets: [{
+      data: chart1Data.map(d => d.value),
+      backgroundColor: chart1Data.map((_, i) => COLORS[i % COLORS.length] + 'CC'),
+      borderRadius: 4
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { x: { beginAtZero: true, title: { display: true, text: '觸發次數' } } }
+  }
+});
+
+// ===== Chart 2: Doughnut =====
+new Chart(document.getElementById('chart2'), {
+  type: 'doughnut',
+  data: {
+    labels: chart2Data.map(d => d.name),
+    datasets: [{
+      data: chart2Data.map(d => d.value),
+      backgroundColor: ['#2b6cb0','#e53e3e','#38a169','#d69e2e','#a0aec0'],
+      borderWidth: 2,
+      borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 12 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+            return `${ctx.label}: ${ctx.raw} (${(ctx.raw/total*100).toFixed(1)}%)`;
+          }
+        }
+      }
+    }
+  }
+});
+
+// ===== Chart 3: Pie =====
+new Chart(document.getElementById('chart3'), {
+  type: 'pie',
+  data: {
+    labels: chart3Data.map(d => d.name),
+    datasets: [{
+      data: chart3Data.map(d => d.value),
+      backgroundColor: ['#e53e3e','#d69e2e','#2b6cb0','#a0aec0'],
+      borderWidth: 2,
+      borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+            return `${ctx.label}: ${ctx.raw} (${(ctx.raw/total*100).toFixed(1)}%)`;
+          }
+        }
+      }
+    }
+  }
+});
+
+// ===== Chart 4: Amplitude bar =====
+new Chart(document.getElementById('chart4'), {
+  type: 'bar',
+  data: {
+    labels: chart6Amp.map(d => d.name),
+    datasets: [
+      { label: '平均幅度%', data: chart6Amp.map(d => d.mean), backgroundColor: '#2b6cb0CC', borderRadius: 4 },
+      { label: '中位數%', data: chart6Amp.map(d => d.median), backgroundColor: '#38a169CC', borderRadius: 4 },
+      { label: '最大幅度%', data: chart6Amp.map(d => d.max), backgroundColor: '#e53e3e44', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { y: { beginAtZero: true, title: { display: true, text: '幅度 (%)' } } }
+  }
+});
+
+// ===== Chart 5: Year Trend (Stacked Line) =====
+const industries = ["生技醫療業","半導體業","光電業","電子零組件業","其他電子業","數位雲端","綠能環保","未分類"];
+let chart5Instance = null;
+let selectedIndustries = new Set(industries);
+
+function renderYearChart() {
+  if (chart5Instance) chart5Instance.destroy();
+  const datasets = industries.filter(ind => selectedIndustries.has(ind)).map((ind, i) => ({
+    label: ind,
+    data: chart4Year.map(d => d[ind] || 0),
+    borderColor: COLORS[i % COLORS.length],
+    backgroundColor: COLORS[i % COLORS.length] + '33',
+    fill: false,
+    tension: 0.3,
+    pointRadius: 5,
+    pointHoverRadius: 8,
+    borderWidth: 2.5
+  }));
+  chart5Instance = new Chart(document.getElementById('chart5'), {
+    type: 'line',
+    data: { labels: chart4Year.map(d => d.year + '年'), datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top', labels: { font: { size: 12 } } } },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: '觸發次數' } }
+      }
+    }
+  });
+}
+
+// Tab buttons
+const tabContainer = document.getElementById('yearTabs');
+const allBtn = document.createElement('button');
+allBtn.className = 'tab-btn active';
+allBtn.textContent = '全部';
+allBtn.onclick = () => {
+  selectedIndustries = new Set(industries);
+  document.querySelectorAll('#yearTabs .tab-btn').forEach(b => b.classList.add('active'));
+  renderYearChart();
+};
+tabContainer.appendChild(allBtn);
+
+industries.forEach((ind, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'tab-btn active';
+  btn.textContent = ind;
+  btn.style.borderColor = COLORS[i % COLORS.length];
+  btn.onclick = () => {
+    if (selectedIndustries.has(ind)) {
+      selectedIndustries.delete(ind);
+      btn.classList.remove('active');
+    } else {
+      selectedIndustries.add(ind);
+      btn.classList.add('active');
+    }
+    allBtn.classList.toggle('active', selectedIndustries.size === industries.length);
+    renderYearChart();
+  };
+  tabContainer.appendChild(btn);
+});
+
+renderYearChart();
+
+// ===== Heatmap Table =====
+function renderHeatmap() {
+  const conds = ["第一款（振幅）","第二款（5日漲幅）","第三款（5日+成交價）","第四款（30日漲幅）"];
+  const allVals = heatmapData.flatMap(d => conds.map(c => d[c] || 0));
+  const maxVal = Math.max(...allVals);
+
+  let html = '<table><tr><th>產業</th>';
+  conds.forEach(c => html += `<th>${c}</th>`);
+  html += '<th>合計</th></tr>';
+
+  // Sort by total
+  heatmapData.sort((a, b) => {
+    const ta = conds.reduce((s, c) => s + (a[c]||0), 0);
+    const tb = conds.reduce((s, c) => s + (b[c]||0), 0);
+    return tb - ta;
+  });
+
+  heatmapData.forEach(row => {
+    const total = conds.reduce((s, c) => s + (row[c]||0), 0);
+    html += `<tr><td style="font-weight:bold;text-align:left">${row.industry}</td>`;
+    conds.forEach(c => {
+      const v = row[c] || 0;
+      const intensity = Math.round(v / maxVal * 200);
+      const bg = v > 0 ? `rgba(43,108,176,${intensity/255})` : 'transparent';
+      const color = intensity > 120 ? 'white' : '#333';
+      html += `<td style="background:${bg};color:${color};font-weight:${v>50?'bold':'normal'}">${v}</td>`;
+    });
+    html += `<td style="font-weight:bold;background:#e2efda">${total}</td></tr>`;
+  });
+  html += '</table>';
+  document.getElementById('heatmapTable').innerHTML = html;
+}
+renderHeatmap();
+
+// ===== Top Stocks Table =====
+function renderTopStocks() {
+  let html = '<table><tr><th>排名</th><th>代號</th><th>名稱</th><th>產業</th><th>觸發次數</th><th style="background:#0d4f8b">首次進入日期</th><th>首→最高漲幅%</th></tr>';
+  topStocks.forEach((s, i) => {
+    const barWidth = (s[3] / topStocks[0][3] * 100).toFixed(0);
+    html += `<tr>
+      <td>${i+1}</td>
+      <td>${s[0]}</td>
+      <td style="font-weight:bold">${s[1]}</td>
+      <td>${s[2]}</td>
+      <td class="bar-cell"><div class="bar-bg" style="width:${barWidth}%"></div><span class="bar-text">${s[3]}</span></td>
+      <td style="font-weight:bold;color:#1a365d;background:#e8f0fe">${s[4]}</td>
+      <td style="font-weight:bold;color:#22543d">${s[5].toFixed(1)}%</td>
+    </tr>`;
+  });
+  html += '</table>';
+  document.getElementById('topStocksTable').innerHTML = html;
+}
+renderTopStocks();
+
+// ===== Chart 8: Disposal condition doughnut =====
+new Chart(document.getElementById('chart8'), {
+  type: 'doughnut',
+  data: {
+    labels: ['第四款（30日漲幅）','第二款（5日漲幅）','第一款（振幅）','第三款（5日+成交價）'],
+    datasets: [{
+      data: [233, 151, 96, 60],
+      backgroundColor: ['#e53e3e','#dd6b20','#d69e2e','#38a169'],
+      borderWidth: 2, borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 12 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+            return `${ctx.label}: ${ctx.raw} (${(ctx.raw/total*100).toFixed(1)}%)`;
+          }
+        }
+      }
+    }
+  }
+});
+
+// ===== Chart 9: Disposal reason x condition =====
+new Chart(document.getElementById('chart9'), {
+  type: 'bar',
+  data: {
+    labels: ['第一款（振幅）','第二款（5日漲幅）','第三款（5日+成交價）','第四款（30日漲幅）'],
+    datasets: [
+      { label: '連續3個營業日', data: [58, 88, 52, 71], backgroundColor: '#2b6cb0CC', borderRadius: 4 },
+      { label: '6日內4個營業日', data: [38, 63, 8, 162], backgroundColor: '#e53e3eCC', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { y: { beginAtZero: true, title: { display: true, text: '次數' } } }
+  }
+});
+
+// ===== Chart 10: Industry disposal rate =====
+const dispRateData = [
+  {name:'化學工業', attn:8, disp:4, rate:50.0},
+  {name:'通信網路業', attn:8, disp:2, rate:25.0},
+  {name:'航運業', attn:5, disp:1, rate:20.0},
+  {name:'其他電子業', attn:21, disp:4, rate:19.0},
+  {name:'光電業', attn:23, disp:4, rate:17.4},
+  {name:'半導體業', attn:52, disp:9, rate:17.3},
+  {name:'電子零組件業', attn:25, disp:4, rate:16.0},
+  {name:'數位雲端', attn:31, disp:4, rate:12.9},
+  {name:'生技醫療業', attn:89, disp:8, rate:9.0},
+  {name:'電機機械', attn:14, disp:1, rate:7.1},
+  {name:'綠能環保', attn:29, disp:2, rate:6.9}
+];
+
+new Chart(document.getElementById('chart10'), {
+  type: 'bar',
+  data: {
+    labels: dispRateData.map(d => d.name),
+    datasets: [
+      { label: '注意股票數', data: dispRateData.map(d => d.attn), backgroundColor: '#2b6cb044', borderColor: '#2b6cb0', borderWidth: 1, borderRadius: 4, yAxisID: 'y' },
+      { label: '被處置股票數', data: dispRateData.map(d => d.disp), backgroundColor: '#e53e3eCC', borderRadius: 4, yAxisID: 'y' },
+      { label: '處置率%', data: dispRateData.map(d => d.rate), type: 'line', borderColor: '#dd6b20', backgroundColor: '#dd6b2033', pointRadius: 6, pointHoverRadius: 9, borderWidth: 2.5, yAxisID: 'y1' }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      y: { beginAtZero: true, position: 'left', title: { display: true, text: '股票數' } },
+      y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '處置率 (%)' }, max: 60 }
+    }
+  }
+});
+
+// ===== Disposal stocks table =====
+const dispStocks = [
+  ["3595","山太士","光電業",7],
+  ["4573","高明鐵","電機機械",4],
+  ["6820","連訊","通信網路業",4],
+  ["6682","華旭矽材","光電業",4],
+  ["7419","達勝","電子零組件業",3],
+  ["5246","勵威","半導體業",2],
+  ["6885","全福生技","生技醫療業",2],
+  ["6272","驊陞","電子零組件業",2],
+  ["7728","光焱科技","其他電子業",2],
+  ["7719","碳基","數位雲端",2],
+  ["6467","泰合","生技醫療業",2]
+];
+let dhtml = '<table><tr><th>排名</th><th>代號</th><th>名稱</th><th>產業</th><th>處置次數</th></tr>';
+dispStocks.forEach((s, i) => {
+  const barWidth = (s[3] / dispStocks[0][3] * 100).toFixed(0);
+  dhtml += `<tr><td>${i+1}</td><td>${s[0]}</td><td style="font-weight:bold">${s[1]}</td><td>${s[2]}</td><td class="bar-cell"><div class="bar-bg" style="width:${barWidth}%;background:#fed7d7"></div><span class="bar-text" style="font-weight:bold;color:#e53e3e">${s[3]}</span></td></tr>`;
+});
+dhtml += '</table>';
+document.getElementById('disposalStocksTable').innerHTML = dhtml;
+
+// ===== Chart 12: Condition → Gain =====
+new Chart(document.getElementById('chart12'), {
+  type: 'bar',
+  data: {
+    labels: ['第二款（5日漲幅）','第一款（振幅）','第三款（5日+成交價）','第四款（30日漲幅）'],
+    datasets: [
+      { label: '平均後續漲幅%', data: [255.0, 91.7, 82.7, 77.1], backgroundColor: '#38a169CC', borderRadius: 4 },
+      { label: '中位數漲幅%', data: [66.7, 53.6, 68.2, 38.7], backgroundColor: '#2b6cb0CC', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { y: { beginAtZero: true, title: { display: true, text: '漲幅 (%)' } } }
+  }
+});
+
+// ===== Chart 13: Success rate =====
+new Chart(document.getElementById('chart13'), {
+  type: 'radar',
+  data: {
+    labels: ['正報酬比例','漲幅>50%','漲幅>100%','樣本數(標準化)','中位數漲幅(標準化)'],
+    datasets: [
+      { label: '第一款（振幅）', data: [82.3, 52.7, 35.0, 100, 53.6/2.55], borderColor: '#2b6cb0', backgroundColor: '#2b6cb022', pointRadius: 4 },
+      { label: '第二款（5日漲幅）', data: [97.2, 58.3, 33.3, 17.7, 66.7/2.55], borderColor: '#38a169', backgroundColor: '#38a16922', pointRadius: 4 },
+      { label: '第四款（30日漲幅）', data: [100, 41.7, 16.7, 11.8, 38.7/2.55], borderColor: '#e53e3e', backgroundColor: '#e53e3e22', pointRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20 } } },
+    plugins: { legend: { position: 'top' } }
+  }
+});
+
+// ===== Top gainers table =====
+const topGainers = [
+  ["3595","山太士","光電業","二","2023/08/02",30.90,1800.94,5728.3],
+  ["3678","聯享","光電業","二","2021/03/02",12.11,145.84,1104.3],
+  ["7419","達勝","電子零組件業","一","2024/05/10",15.60,178.12,1041.8],
+  ["4573","高明鐵","電機機械","四","2024/06/07",35.65,325.73,813.7],
+  ["6725","矽科宏晟","其他電子業","一","2023/01/09",47.04,341.96,627.0],
+  ["1294","漢田生技","食品工業","一","2022/09/30",41.53,282.88,581.1],
+  ["5246","勵威","半導體業","一","2022/11/03",29.25,190.71,552.0],
+  ["6724","創王","未分類","一","2021/08/16",10.95,67.72,518.5],
+  ["7799","禾榮科","生技醫療業","一","2024/11/27",152.15,916.98,502.7],
+  ["6820","連訊","通信網路業","一","2021/03/22",45.32,261.33,476.6],
+  ["3485","敘豐","光電業","一","2021/04/26",34.93,176.60,405.6],
+  ["6586","醣基","生技醫療業","一","2021/05/25",36.02,181.84,404.8],
+  ["5297","廣化","半導體業","一","2021/02/22",17.18,86.51,403.6],
+  ["7822","倍利科","未分類","一","2025/03/27",340.11,1698.09,399.3],
+  ["6682","碩鑽材料","光電業","一","2021/07/12",14.93,70.12,369.7]
+];
+let ghtml = '<table><tr><th>排名</th><th>代號</th><th>名稱</th><th>產業</th><th>首次條款</th><th style="background:#0d4f8b">首次進入日期</th><th>首次價格</th><th>期間最高價</th><th>最高漲幅%</th></tr>';
+topGainers.forEach((s, i) => {
+  const barWidth = Math.min((s[7] / topGainers[0][7] * 100), 100).toFixed(0);
+  const condLabel = {'一':'第一款','二':'第二款','三':'第三款','四':'第四款'}[s[3]] || s[3];
+  ghtml += `<tr><td>${i+1}</td><td>${s[0]}</td><td style="font-weight:bold">${s[1]}</td><td>${s[2]}</td><td style="background:${s[3]==='二'?'#c6efce':s[3]==='一'?'#d6e4f0':'#fff3cd'};font-weight:bold">${condLabel}</td><td style="font-weight:bold;color:#1a365d;background:#e8f0fe">${s[4]}</td><td>${s[5].toFixed(2)}</td><td style="font-weight:bold">${s[6].toFixed(2)}</td><td class="bar-cell"><div class="bar-bg" style="width:${barWidth}%;background:#c6efce"></div><span class="bar-text" style="font-weight:bold;color:#22543d">${s[7].toFixed(1)}%</span></td></tr>`;
+});
+ghtml += '</table>';
+document.getElementById('topGainersTable').innerHTML = ghtml;
+
+// ===== T+5 ANALYSIS CHARTS =====
+
+// Chart T1: T+5 by condition - dual axis (bar + line)
+new Chart(document.getElementById('chartT1'), {
+  type: 'bar',
+  data: {
+    labels: ['第一款（振幅）','第三款（5日+成交價）','第二款（5日漲幅）','第四款（30日漲幅）'],
+    datasets: [
+      { label: '平均T+5報酬%', data: [18.2, 8.5, 9.4, 6.3], backgroundColor: '#805ad5CC', borderRadius: 4, yAxisID: 'y' },
+      { label: '中位數T+5報酬%', data: [16.9, 10.4, 5.3, 3.7], backgroundColor: '#38a169CC', borderRadius: 4, yAxisID: 'y' },
+      { label: '勝率%', data: [72.0, 79.0, 65.9, 63.3], type: 'line', borderColor: '#e53e3e', backgroundColor: '#e53e3e33', pointRadius: 7, pointHoverRadius: 10, borderWidth: 2.5, yAxisID: 'y1',
+        datalabels: { display: true } }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: {
+        callbacks: {
+          afterBody: function(items) {
+            const counts = [200, 62, 217, 390];
+            return '樣本數: ' + counts[items[0].dataIndex];
+          }
+        }
+      }
+    },
+    scales: {
+      y: { beginAtZero: true, position: 'left', title: { display: true, text: 'T+5 報酬 (%)' } },
+      y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '勝率 (%)' }, min: 50, max: 90 }
+    }
+  }
+});
+
+// Chart T2: Condition × Direction combo bar chart
+const comboLabels = ['第一款+振幅','第三款+漲','第一款+漲','第二款+漲','第四款+漲','第二款+跌','第一款+跌'];
+const comboWinRate = [78.7, 78.3, 74.6, 72.1, 63.3, 32.4, 28.6];
+const comboMean = [22.8, 8.1, 18.8, 11.9, 6.3, -4.2, -7.3];
+const comboCount = [108, 60, 71, 183, 390, 34, 21];
+const comboColors = comboWinRate.map(w => w >= 70 ? '#38a169' : w >= 50 ? '#d69e2e' : '#e53e3e');
+
+new Chart(document.getElementById('chartT2'), {
+  type: 'bar',
+  data: {
+    labels: comboLabels,
+    datasets: [{
+      label: '勝率%',
+      data: comboWinRate,
+      backgroundColor: comboColors.map(c => c + 'CC'),
+      borderRadius: 6,
+      borderWidth: 0
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          afterLabel: function(ctx) {
+            const i = ctx.dataIndex;
+            return `平均報酬: ${comboMean[i]>0?'+':''}${comboMean[i]}%\n樣本數: ${comboCount[i]}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { beginAtZero: true, max: 100, title: { display: true, text: '勝率 (%)' },
+        ticks: { callback: v => v + '%' }
+      }
+    }
+  }
+});
+
+// Chart T3: T+5 Distribution histogram
+const distLabels = ['<-30%','-30~-20%','-20~-10%','-10~0%','0~10%','10~20%','20~30%','30~50%','50~100%','>100%'];
+const distValues = [43, 32, 70, 141, 210, 153, 74, 85, 50, 11];
+const distColors = distLabels.map(l => l.startsWith('<-') || l.startsWith('-') ? '#e53e3eAA' : '#38a169AA');
+
+new Chart(document.getElementById('chartT3'), {
+  type: 'bar',
+  data: {
+    labels: distLabels,
+    datasets: [{
+      label: '筆數',
+      data: distValues,
+      backgroundColor: ['#c53030CC','#e53e3eCC','#ed8936CC','#ecc94bCC','#48bb78CC','#38a169CC','#2f855aCC','#276749CC','#22543dCC','#1a4731CC'],
+      borderRadius: 4
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          afterLabel: ctx => `佔比: ${(ctx.raw/869*100).toFixed(1)}%`
+        }
+      }
+    },
+    scales: {
+      y: { beginAtZero: true, title: { display: true, text: '筆數' } },
+      x: { title: { display: true, text: 'T+5 報酬區間' } }
+    }
+  }
+});
+
+// Chart T4: T+5 by industry - dual axis
+const t4Industries = ['電機機械','半導體業','其他電子業','通信網路業','電子零組件業','數位雲端','光電業','化學工業','綠能環保','生技醫療業','未分類','文化創意業'];
+const t4Mean = [15.3, 11.1, 11.7, 11.9, 10.7, 23.8, 9.6, 14.2, 25.8, 9.3, 1.5, 2.7];
+const t4WinRate = [95.2, 82.9, 81.8, 78.8, 75.6, 74.4, 73.3, 69.7, 66.7, 62.4, 45.9, 45.0];
+const t4Count = [21, 117, 44, 33, 82, 43, 86, 33, 24, 178, 146, 20];
+
+new Chart(document.getElementById('chartT4'), {
+  type: 'bar',
+  data: {
+    labels: t4Industries,
+    datasets: [
+      { label: '平均T+5報酬%', data: t4Mean, backgroundColor: '#805ad5AA', borderRadius: 4, yAxisID: 'y' },
+      { label: '勝率%', data: t4WinRate, type: 'line', borderColor: '#e53e3e', backgroundColor: '#e53e3e33', pointRadius: 6, pointHoverRadius: 9, borderWidth: 2.5, yAxisID: 'y1' }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: {
+        callbacks: {
+          afterBody: items => '樣本數: ' + t4Count[items[0].dataIndex]
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { maxRotation: 45 } },
+      y: { beginAtZero: true, position: 'left', title: { display: true, text: '平均 T+5 報酬 (%)' } },
+      y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '勝率 (%)' }, min: 30, max: 100 }
+    }
+  }
+});
+
+// T+5 Strategy ranking table
+const t5Strategies = [
+  ['第一款（振幅）+ 振幅', 108, 78.7, 22.8, 24.3, 74.1, '#22543d'],
+  ['第三款（5日+成交價）+ 漲', 60, 78.3, 8.1, 10.4, 50.0, '#22543d'],
+  ['第一款（振幅）+ 漲', 71, 74.6, 18.8, 7.9, 49.3, '#38a169'],
+  ['第二款（5日漲幅）+ 漲', 183, 72.1, 11.9, 7.1, 46.4, '#38a169'],
+  ['第四款（30日漲幅）+ 漲', 390, 63.3, 6.3, 3.7, 32.8, '#d69e2e'],
+  ['第二款（5日漲幅）+ 跌', 34, 32.4, -4.2, -12.7, 26.5, '#e53e3e'],
+  ['第一款（振幅）+ 跌', 21, 28.6, -7.3, -17.7, 23.8, '#e53e3e']
+];
+let t5html = '<table><tr><th>排名</th><th>策略組合</th><th>樣本數</th><th>勝率%</th><th>平均T+5報酬%</th><th>中位數T+5%</th><th>>10%機率</th></tr>';
+t5Strategies.forEach((s, i) => {
+  const wrBar = Math.min(s[2], 100);
+  t5html += `<tr>
+    <td style="font-weight:bold;font-size:16px;color:${s[6]}">${i+1}</td>
+    <td style="font-weight:bold;text-align:left;padding-left:16px">${s[0]}</td>
+    <td>${s[1]}</td>
+    <td class="bar-cell"><div class="bar-bg" style="width:${wrBar}%;background:${s[2]>=70?'#c6efce':s[2]>=50?'#fff3cd':'#fecaca'}"></div><span class="bar-text" style="font-weight:bold;color:${s[6]}">${s[2]}%</span></td>
+    <td style="font-weight:bold;color:${s[3]>=0?'#22543d':'#e53e3e'}">${s[3]>0?'+':''}${s[3]}%</td>
+    <td style="color:${s[4]>=0?'#22543d':'#e53e3e'}">${s[4]>0?'+':''}${s[4]}%</td>
+    <td style="font-weight:bold">${s[5]}%</td>
+  </tr>`;
+});
+t5html += '</table>';
+document.getElementById('t5StrategyTable').innerHTML = t5html;
+</script>
+</body>
+</html>

@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>興櫃處置預警系統</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Microsoft JhengHei',sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a0a2e 0%,#2d1b4e 50%,#1a2332 100%);padding:24px 32px;border-bottom:2px solid #30363d}
+.header h1{font-size:26px;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header p{font-size:13px;color:#8b949e;margin-top:4px}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+.stat{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px;text-align:center}
+.stat .num{font-size:32px;font-weight:700}
+.stat .label{font-size:12px;color:#8b949e;margin-top:4px}
+.red{color:#f85149}.orange{color:#d29922}.green{color:#3fb950}.purple{color:#a78bfa}.blue{color:#58a6ff}
+.section{margin-bottom:28px}
+.section-title{font-size:18px;font-weight:700;padding:12px 16px;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.section-title .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.risk-0 .section-title{background:linear-gradient(90deg,#3d1010,#1a1a2e);border-left:4px solid #f85149}
+.risk-0 .dot{background:#f85149}
+.risk-1 .section-title{background:linear-gradient(90deg,#3d2e10,#1a1a2e);border-left:4px solid #d29922}
+.risk-1 .dot{background:#d29922}
+.risk-2 .section-title{background:linear-gradient(90deg,#102a3d,#1a1a2e);border-left:4px solid #58a6ff}
+.risk-2 .dot{background:#58a6ff}
+.stock-table{width:100%;border-collapse:collapse;font-size:13px}
+.stock-table th{background:#21262d;color:#8b949e;padding:8px 10px;text-align:center;font-weight:600;border-bottom:1px solid #30363d;position:sticky;top:0}
+.stock-table td{padding:8px 10px;border-bottom:1px solid #21262d;text-align:center;vertical-align:middle}
+.stock-table tr:hover{background:#1c2128}
+.stock-name{font-weight:700;color:#e6edf3;text-align:left!important}
+.stock-code{color:#8b949e;font-size:12px}
+.cond-tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;margin:1px}
+.cond-1{background:#1f3a1f;color:#3fb950;border:1px solid #238636}
+.cond-2{background:#3d2e10;color:#d29922;border:1px solid #9e6a03}
+.cond-3{background:#1a2744;color:#58a6ff;border:1px solid #1f6feb}
+.cond-4{background:#3d1010;color:#f85149;border:1px solid #da3633}
+.progress-bar{display:flex;gap:3px;justify-content:center;align-items:center}
+.progress-dot{width:16px;height:16px;border-radius:4px;display:inline-block}
+.dot-filled-a{background:#d29922}
+.dot-filled-b{background:#58a6ff}
+.dot-filled-ab{background:linear-gradient(135deg,#d29922 50%,#58a6ff 50%)}
+.dot-empty{background:#21262d;border:1px solid #30363d}
+.dot-danger{background:#f85149;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.timeline{display:flex;gap:2px;justify-content:flex-end;align-items:center}
+.tl-dot{width:10px;height:20px;border-radius:2px;display:inline-block;position:relative}
+.tl-none{background:#21262d}
+.tl-only1{background:#238636}
+.tl-has23{background:#d29922}
+.tl-has234{background:#58a6ff}
+.tl-has2344{background:#f85149}
+.tl-dot:hover::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#30363d;color:#e6edf3;padding:4px 8px;border-radius:4px;font-size:11px;white-space:nowrap;z-index:10}
+.risk-badge{display:inline-block;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:700}
+.badge-danger{background:#f8514933;color:#f85149;border:1px solid #f85149}
+.badge-warning{background:#d2992233;color:#d29922;border:1px solid #d29922}
+.badge-info{background:#58a6ff33;color:#58a6ff;border:1px solid #58a6ff}
+.badge-safe{background:#3fb95033;color:#3fb950;border:1px solid #3fb950}
+.disposed-tag{background:#f8514922;color:#f85149;padding:2px 8px;border-radius:10px;font-size:11px}
+.rule-box{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.rule-a{background:#d2992222;color:#d29922;border:1px solid #9e6a0355}
+.rule-b{background:#58a6ff22;color:#58a6ff;border:1px solid #1f6feb55}
+.info-box{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;margin-bottom:24px}
+.info-box h3{color:#a78bfa;margin-bottom:12px;font-size:15px}
+.info-box p{color:#8b949e;font-size:13px;line-height:1.8}
+.info-box .highlight{color:#e6edf3;font-weight:700}
+.info-box .tag-a{color:#d29922;font-weight:700}
+.info-box .tag-b{color:#58a6ff;font-weight:700}
+.recent-disp{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.disp-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;font-size:12px}
+.disp-card .d-name{font-weight:700;color:#f85149}
+.disp-card .d-date{color:#8b949e}
+.disp-card .d-reason{color:#d29922;font-size:11px}
+.filter-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{padding:6px 14px;border-radius:16px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer;font-size:12px;transition:all 0.2s}
+.filter-btn:hover{border-color:#58a6ff;color:#58a6ff}
+.filter-btn.active{background:#58a6ff22;color:#58a6ff;border-color:#58a6ff}
+.accuracy-badge{background:#3fb95022;color:#3fb950;border:1px solid #238636;padding:4px 12px;border-radius:12px;font-size:13px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="header">
+  <div style="display:flex;justify-content:space-between;align-items:center;max-width:1400px;margin:0 auto">
+    <div>
+      <h1>興櫃處置預警系統</h1>
+      <p>依據「興櫃股票公布或通知注意交易資訊暨處置作業要點」第四條建立 | 資料更新：<span id="updateDate"></span></p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button id="fetchPriceBtn" onclick="fetchAllPrices()" style="padding:8px 18px;border-radius:8px;border:1px solid #58a6ff;background:#58a6ff22;color:#58a6ff;cursor:pointer;font-size:13px;font-weight:700;transition:all 0.2s">即時更新股價</button>
+      <span id="priceStatus" style="font-size:12px;color:#8b949e"></span>
+      <span class="accuracy-badge">歷史驗證召回率 100%</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats-row">
+    <div class="stat" style="border-top:3px solid #f85149"><div class="num red" id="sRisk0">-</div><div class="label">已達處置標準</div></div>
+    <div class="stat" style="border-top:3px solid #d29922"><div class="num orange" id="sRisk1">-</div><div class="label">差1次處置</div></div>
+    <div class="stat" style="border-top:3px solid #58a6ff"><div class="num blue" id="sRisk2">-</div><div class="label">差2次處置</div></div>
+    <div class="stat" style="border-top:3px solid #a78bfa"><div class="num purple" id="sTotal">-</div><div class="label">近30日活躍股票</div></div>
+    <div class="stat" style="border-top:3px solid #3fb950"><div class="num green" id="sDisp">-</div><div class="label">近30天處置事件</div></div>
+  </div>
+
+  <div class="info-box">
+    <h3>處置規則說明（興櫃專用）</h3>
+    <p>
+      <span class="tag-a">規則A</span>：<span class="highlight">連續3個營業日</span>被公告注意（僅計<span class="highlight">第二款</span>+<span class="highlight">第三款</span>）→ 處置<br>
+      <span class="tag-b">規則B</span>：<span class="highlight">最近6個營業日內有4個營業日</span>被公告注意（計<span class="highlight">第二款</span>~<span class="highlight">第四款</span>）→ 處置<br>
+      <span style="color:#3fb950;font-weight:700">第一款（振幅）永遠不計入處置累計</span>，只有第二~四款才會推進處置進度。
+    </p>
+  </div>
+
+  <div id="recentDisp"></div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="filterStocks('all')">全部</button>
+    <button class="filter-btn" onclick="filterStocks(0)">已達標準</button>
+    <button class="filter-btn" onclick="filterStocks(1)">差1次</button>
+    <button class="filter-btn" onclick="filterStocks(2)">差2次</button>
+    <button class="filter-btn" onclick="filterStocks('safe')">暫時安全</button>
+  </div>
+
+  <div id="stockSections"></div>
+</div>
+
+<script>
+const DATA = {"date": "2026/04/17", "total_attn": 1682, "total_stocks": 73, "risk0": 10, "risk1": 10, "risk2": 9, "accuracy": 100.0, "stocks": [{"code": "7419.0", "name": "達勝", "ind": "電子零組件業", "price": 211.06, "latest": "2026/04/15", "conds": ["2", "4"], "rA": 3, "rB": 4, "rem": 0, "tl": [{"d": "03/10", "c": ["4"], "a": false, "b": true}, {"d": "03/11", "c": ["4"], "a": false, "b": true}, {"d": "03/12", "c": ["4"], "a": false, "b": true}, {"d": "03/13", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/16", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/19", "c": ["4"], "a": false, "b": true}, {"d": "04/01", "c": ["4"], "a": false, "b": true}, {"d": "04/02", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/07", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/08", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 12, "disp": false}, {"code": "3595.0", "name": "山太士", "ind": "光電業", "price": 1800.94, "latest": "2026/03/23", "conds": ["3", "4"], "rA": 3, "rB": 5, "rem": 0, "tl": [{"d": "03/13", "c": ["3", "4"], "a": true, "b": true}, {"d": "03/16", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/17", "c": ["3", "4"], "a": true, "b": true}, {"d": "03/19", "c": ["3", "4"], "a": true, "b": true}, {"d": "03/20", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/23", "c": ["3", "4"], "a": true, "b": true}], "n30": 6, "disp": false}, {"code": "6990.0", "name": "華鉬", "ind": "綠能環保", "price": 89.8, "latest": "2026/04/13", "conds": ["4"], "rA": 4, "rB": 4, "rem": 0, "tl": [{"d": "03/19", "c": ["1", "2"], "a": true, "b": true}, {"d": "03/20", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/23", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/24", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/31", "c": ["1"], "a": false, "b": false}, {"d": "04/13", "c": ["4"], "a": false, "b": true}, {"d": "04/14", "c": ["2", "4"], "a": true, "b": true}], "n30": 7, "disp": false}, {"code": "7742.0", "name": "天弘化", "ind": "化學工業", "price": 211.22, "latest": "2026/04/13", "conds": ["2", "3", "4"], "rA": 2, "rB": 5, "rem": 0, "tl": [{"d": "03/19", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/20", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/23", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/25", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/26", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/13", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["2", "3", "4"], "a": true, "b": true}], "n30": 7, "disp": false}, {"code": "7866.0", "name": "丹立", "ind": "半導體業", "price": 177.45, "latest": "2026/04/13", "conds": ["4"], "rA": 4, "rB": 4, "rem": 0, "tl": [{"d": "03/16", "c": ["1"], "a": false, "b": false}, {"d": "03/17", "c": ["2"], "a": true, "b": true}, {"d": "03/18", "c": ["2"], "a": true, "b": true}, {"d": "03/19", "c": ["2"], "a": true, "b": true}, {"d": "03/20", "c": ["2"], "a": true, "b": true}, {"d": "04/09", "c": ["4"], "a": false, "b": true}, {"d": "04/13", "c": ["4"], "a": false, "b": true}, {"d": "04/14", "c": ["4"], "a": false, "b": true}], "n30": 8, "disp": false}, {"code": "4573.0", "name": "高明鐵", "ind": "電機機械", "price": 459.59, "latest": "2026/04/13", "conds": ["2", "3", "4"], "rA": 2, "rB": 4, "rem": 0, "tl": [{"d": "03/16", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/17", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/19", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/20", "c": ["3", "4"], "a": true, "b": true}, {"d": "04/10", "c": ["3", "4"], "a": true, "b": true}, {"d": "04/13", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/15", "c": ["3", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["3", "4"], "a": true, "b": true}], "n30": 9, "disp": false}, {"code": "6820.0", "name": "連訊", "ind": "通信網路業", "price": 304.8, "latest": "2026/04/13", "conds": ["3", "4"], "rA": 1, "rB": 4, "rem": 0, "tl": [{"d": "03/26", "c": ["4"], "a": false, "b": true}, {"d": "03/27", "c": ["1", "2", "3", "4"], "a": true, "b": true}, {"d": "03/30", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/01", "c": ["3", "4"], "a": true, "b": true}, {"d": "04/13", "c": ["3", "4"], "a": true, "b": true}], "n30": 5, "disp": false}, {"code": "7815.0", "name": "新特", "ind": "半導體業", "price": 503.83, "latest": "2026/04/14", "conds": ["3", "4"], "rA": 4, "rB": 4, "rem": 0, "tl": [{"d": "03/23", "c": ["3"], "a": true, "b": true}, {"d": "03/24", "c": ["3", "4"], "a": true, "b": true}, {"d": "03/25", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/26", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["3", "4"], "a": true, "b": true}], "n30": 5, "disp": false}, {"code": "6559.0", "name": "研晶", "ind": "光電業", "price": 25.24, "latest": "2026/04/14", "conds": ["1"], "rA": 3, "rB": 3, "rem": 0, "tl": [{"d": "03/23", "c": ["1", "2"], "a": true, "b": true}, {"d": "03/24", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/25", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["1"], "a": false, "b": false}, {"d": "04/15", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 6, "disp": false}, {"code": "7853.0", "name": "政美應用", "ind": "半導體業", "price": 359.42, "latest": "2026/04/13", "conds": ["1", "2", "3", "4"], "rA": 3, "rB": 3, "rem": 0, "tl": [{"d": "03/18", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/19", "c": ["2", "3"], "a": true, "b": true}, {"d": "03/20", "c": ["2", "3"], "a": true, "b": true}, {"d": "04/10", "c": ["3", "4"], "a": true, "b": true}, {"d": "04/13", "c": ["1", "2", "3", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["3", "4"], "a": true, "b": true}], "n30": 7, "disp": false}, {"code": "5246.0", "name": "勵威", "ind": "半導體業", "price": 293.66, "latest": "2026/04/15", "conds": ["2", "3", "4"], "rA": 2, "rB": 1, "rem": 1, "tl": [{"d": "03/09", "c": ["4"], "a": false, "b": true}, {"d": "03/10", "c": ["4"], "a": false, "b": true}, {"d": "03/11", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/12", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/17", "c": ["4"], "a": false, "b": true}, {"d": "03/25", "c": ["1"], "a": false, "b": false}, {"d": "03/26", "c": ["4"], "a": false, "b": true}, {"d": "04/15", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "3", "4"], "a": true, "b": true}], "n30": 9, "disp": false}, {"code": "6983.0", "name": "華洋精機", "ind": "其他電子業", "price": 481.33, "latest": "2026/04/13", "conds": ["3"], "rA": 2, "rB": 2, "rem": 1, "tl": [{"d": "03/13", "c": ["3", "4"], "a": true, "b": true}, {"d": "03/16", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/17", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "03/19", "c": ["3", "4"], "a": true, "b": true}, {"d": "03/20", "c": ["3", "4"], "a": true, "b": true}, {"d": "03/30", "c": ["3"], "a": true, "b": true}, {"d": "03/31", "c": ["3"], "a": true, "b": true}, {"d": "04/13", "c": ["3"], "a": true, "b": true}, {"d": "04/14", "c": ["3"], "a": true, "b": true}], "n30": 9, "disp": false}, {"code": "5297.0", "name": "廣化", "ind": "半導體業", "price": 95.22, "latest": "2026/04/13", "conds": ["1", "4"], "rA": 2, "rB": 3, "rem": 1, "tl": [{"d": "03/11", "c": ["1"], "a": false, "b": false}, {"d": "03/16", "c": ["1", "2"], "a": true, "b": true}, {"d": "03/17", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/20", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/23", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/26", "c": ["4"], "a": false, "b": true}, {"d": "04/13", "c": ["1", "4"], "a": false, "b": true}, {"d": "04/14", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 10, "disp": false}, {"code": "5271.0", "name": "紘通", "ind": "電子零組件業", "price": 26.53, "latest": "2026/04/15", "conds": ["1", "2", "4"], "rA": 1, "rB": 3, "rem": 1, "tl": [{"d": "03/13", "c": ["1"], "a": false, "b": false}, {"d": "03/16", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "03/17", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/19", "c": ["2"], "a": true, "b": true}, {"d": "04/15", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["1", "2", "4"], "a": true, "b": true}], "n30": 6, "disp": false}, {"code": "7899.0", "name": "景美", "ind": "半導體業", "price": 568.62, "latest": "2026/04/15", "conds": ["2", "3"], "rA": 1, "rB": 3, "rem": 1, "tl": [{"d": "03/23", "c": ["3"], "a": true, "b": true}, {"d": "03/24", "c": ["2", "3"], "a": true, "b": true}, {"d": "03/26", "c": ["2", "3"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "3"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "3"], "a": true, "b": true}], "n30": 5, "disp": false}, {"code": "4587.0", "name": "寶元數控", "ind": "電機機械", "price": 54.65, "latest": "2026/04/15", "conds": ["2", "4"], "rA": 2, "rB": 2, "rem": 1, "tl": [{"d": "03/25", "c": ["1", "2"], "a": true, "b": true}, {"d": "03/26", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["1", "4"], "a": false, "b": true}], "n30": 4, "disp": false}, {"code": "5240.0", "name": "建騰", "ind": "光電業", "price": 29.98, "latest": "2026/03/16", "conds": ["2"], "rA": 2, "rB": 2, "rem": 1, "tl": [{"d": "03/13", "c": ["1", "2"], "a": true, "b": true}, {"d": "03/16", "c": ["2"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "6979.0", "name": "勝釩", "ind": "光電業", "price": 240.07, "latest": "2026/04/16", "conds": ["2", "4"], "rA": 2, "rB": 2, "rem": 1, "tl": [{"d": "03/20", "c": ["1", "2"], "a": true, "b": true}, {"d": "03/23", "c": ["2"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "7828.0", "name": "創新服務", "ind": "半導體業", "price": 1390.99, "latest": "2026/03/23", "conds": ["3"], "rA": 2, "rB": 2, "rem": 1, "tl": [{"d": "03/20", "c": ["3"], "a": true, "b": true}, {"d": "03/23", "c": ["3"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "8098.0", "name": "慶康科技", "ind": "半導體業", "price": 381.02, "latest": "2026/04/15", "conds": ["3"], "rA": 2, "rB": 2, "rem": 1, "tl": [{"d": "03/23", "c": ["3"], "a": true, "b": true}, {"d": "03/24", "c": ["3"], "a": true, "b": true}, {"d": "04/15", "c": ["3"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "3"], "a": true, "b": true}], "n30": 4, "disp": false}, {"code": "7858.0", "name": "芝普", "ind": "化學工業", "price": 241.81, "latest": "2026/04/13", "conds": ["1", "3", "4"], "rA": 1, "rB": 1, "rem": 2, "tl": [{"d": "03/19", "c": ["2"], "a": true, "b": true}, {"d": "03/20", "c": ["2"], "a": true, "b": true}, {"d": "03/24", "c": ["2", "4"], "a": true, "b": true}, {"d": "03/25", "c": ["4"], "a": false, "b": true}, {"d": "04/08", "c": ["4"], "a": false, "b": true}, {"d": "04/13", "c": ["1", "3", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["3", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["3", "4"], "a": true, "b": true}], "n30": 8, "disp": false}, {"code": "2256.0", "name": "歐特明", "ind": "其他電子業", "price": 66.2, "latest": "2026/03/16", "conds": ["2", "4"], "rA": 1, "rB": 2, "rem": 2, "tl": [{"d": "03/11", "c": ["1"], "a": false, "b": false}, {"d": "03/12", "c": ["2"], "a": true, "b": true}, {"d": "03/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "4765.0", "name": "磐采", "ind": "化學工業", "price": 29.41, "latest": "2026/04/15", "conds": ["4"], "rA": 1, "rB": 1, "rem": 2, "tl": [{"d": "03/17", "c": ["1"], "a": false, "b": false}, {"d": "03/20", "c": ["2"], "a": true, "b": true}, {"d": "03/27", "c": ["1"], "a": false, "b": false}, {"d": "04/15", "c": ["4"], "a": false, "b": true}], "n30": 4, "disp": false}, {"code": "7558.0", "name": "群利科技", "ind": "數位雲端", "price": 27.01, "latest": "2026/04/16", "conds": ["2", "4"], "rA": 1, "rB": 1, "rem": 2, "tl": [{"d": "03/10", "c": ["1"], "a": false, "b": false}, {"d": "03/16", "c": ["2"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "7781.0", "name": "昕力資*", "ind": "其他業", "price": 34.1, "latest": "2026/03/20", "conds": ["2"], "rA": 1, "rB": 1, "rem": 2, "tl": [{"d": "03/18", "c": ["1"], "a": false, "b": false}, {"d": "03/20", "c": ["2"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "7825.0", "name": "和亞智慧", "ind": "其他電子業", "price": 169.88, "latest": "2026/04/13", "conds": ["2", "4"], "rA": 0, "rB": 2, "rem": 2, "tl": [{"d": "04/07", "c": ["1", "4"], "a": false, "b": true}, {"d": "04/08", "c": ["4"], "a": false, "b": true}, {"d": "04/10", "c": ["4"], "a": false, "b": true}, {"d": "04/13", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["4"], "a": false, "b": true}, {"d": "04/16", "c": ["4"], "a": false, "b": true}], "n30": 6, "disp": false}, {"code": "7886.0", "name": "科建", "ind": "半導體業", "price": 211.47, "latest": "2026/03/26", "conds": ["3"], "rA": 1, "rB": 2, "rem": 2, "tl": [{"d": "03/23", "c": ["3"], "a": true, "b": true}, {"d": "03/26", "c": ["3"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "8298.0", "name": "威睿", "ind": "資訊服務業", "price": 57.8, "latest": "2026/04/15", "conds": ["1", "2"], "rA": 1, "rB": 1, "rem": 2, "tl": [{"d": "03/25", "c": ["1"], "a": false, "b": false}, {"d": "03/26", "c": ["2"], "a": true, "b": true}, {"d": "04/15", "c": ["1", "2"], "a": true, "b": true}, {"d": "04/16", "c": ["1", "2", "4"], "a": true, "b": true}], "n30": 4, "disp": false}, {"code": "7890.0", "name": "明曜科技", "ind": "綠能環保", "price": 121.36, "latest": "2026/03/24", "conds": ["2"], "rA": 1, "rB": 1, "rem": 2, "tl": [{"d": "03/24", "c": ["2"], "a": true, "b": true}], "n30": 1, "disp": false}, {"code": "3616.0", "name": "泓辰", "ind": "未分類", "price": 12.31, "latest": "2026/03/17", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/12", "c": ["1"], "a": false, "b": false}, {"d": "03/17", "c": ["1"], "a": false, "b": false}], "n30": 2, "disp": false}, {"code": "7849.0", "name": "旭誼", "ind": "其他電子業", "price": 158.09, "latest": "2026/03/27", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/26", "c": ["1"], "a": false, "b": false}, {"d": "03/27", "c": ["1"], "a": false, "b": false}], "n30": 2, "disp": false}, {"code": "3184.0", "name": "微邦", "ind": "生技醫療業", "price": 21.09, "latest": "2026/04/02", "conds": ["4"], "rA": 0, "rB": 1, "rem": 3, "tl": [{"d": "04/02", "c": ["4"], "a": false, "b": true}], "n30": 1, "disp": false}, {"code": "3585.0", "name": "聯致", "ind": "電子零組件業", "price": 40.21, "latest": "2026/04/14", "conds": ["1", "2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/24", "c": ["1"], "a": false, "b": false}, {"d": "04/14", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/15", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 4, "disp": false}, {"code": "3678.0", "name": "聯享", "ind": "光電業", "price": 57.42, "latest": "2026/04/07", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/07", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "4553.0", "name": "盛復", "ind": "電機機械", "price": 29.63, "latest": "2026/04/15", "conds": ["1", "2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/30", "c": ["1"], "a": false, "b": false}, {"d": "04/15", "c": ["1", "2"], "a": true, "b": true}, {"d": "04/16", "c": ["2"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "5248.0", "name": "景傳", "ind": "光電業", "price": 23.22, "latest": "2026/03/23", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/23", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "6027.0", "name": "德信", "ind": "金融業", "price": 12.84, "latest": "2026/04/01", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/01", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "6565.0", "name": "物聯", "ind": "其他業", "price": 17.53, "latest": "2026/03/25", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/25", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "6784.0", "name": "天凱科技", "ind": "通信網路業", "price": 25.6, "latest": "2026/03/25", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/25", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "7530.0", "name": "鋒魁科技", "ind": "半導體業", "price": 35.08, "latest": "2026/04/15", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/25", "c": ["1"], "a": false, "b": false}, {"d": "04/15", "c": ["1"], "a": false, "b": false}], "n30": 2, "disp": false}, {"code": "7578.0", "name": "利百景", "ind": "數位雲端", "price": 38.7, "latest": "2026/03/23", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/23", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "7759.0", "name": "視航生醫", "ind": "生技醫療業", "price": 40.56, "latest": "2026/03/16", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/16", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "7771.0", "name": "綠基", "ind": "光電業", "price": 63.07, "latest": "2026/03/27", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "03/27", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "7813.0", "name": "宇辰系統", "ind": "其他電子業", "price": 172.03, "latest": "2026/04/13", "conds": ["2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/08", "c": ["1"], "a": false, "b": false}, {"d": "04/10", "c": ["2"], "a": true, "b": true}, {"d": "04/13", "c": ["2"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "7875.0", "name": "安圖斯", "ind": "電腦及週邊設備業", "price": 130.33, "latest": "2026/03/12", "conds": ["4"], "rA": 0, "rB": 1, "rem": 3, "tl": [{"d": "03/12", "c": ["4"], "a": false, "b": true}], "n30": 1, "disp": false}, {"code": "8058.0", "name": "耐特", "ind": "其他電子業", "price": 140.9, "latest": "2026/03/26", "conds": ["4"], "rA": 0, "rB": 1, "rem": 3, "tl": [{"d": "03/26", "c": ["4"], "a": false, "b": true}], "n30": 1, "disp": false}, {"code": "2255.0", "name": "凱銳光電", "ind": "其他電子業", "price": 23.57, "latest": "2026/04/16", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/16", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "3117.0", "name": "年程", "ind": "電子零組件業", "price": 22.17, "latest": "2026/04/15", "conds": ["1", "2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "6434.0", "name": "達輝光電", "ind": "光電業", "price": 10.72, "latest": "2026/04/15", "conds": ["1", "2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "6536.0", "name": "碩豐", "ind": "資訊服務業", "price": 22.66, "latest": "2026/04/15", "conds": ["1", "2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1", "2"], "a": true, "b": true}, {"d": "04/16", "c": ["1", "2"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "6572.0", "name": "博智", "ind": "生技醫療業", "price": 40.67, "latest": "2026/04/16", "conds": ["1", "2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/16", "c": ["1", "2", "4"], "a": true, "b": true}], "n30": 1, "disp": false}, {"code": "6920.0", "name": "恆勁科技", "ind": "半導體業", "price": 71.57, "latest": "2026/04/13", "conds": ["2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/10", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/13", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/14", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "3", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "3", "4"], "a": true, "b": true}], "n30": 5, "disp": false}, {"code": "7763.0", "name": "崇舜", "ind": "化學工業", "price": 206.79, "latest": "2026/04/14", "conds": ["3"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/14", "c": ["3"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "7887.0", "name": "宇川精材", "ind": "半導體業", "price": 209.78, "latest": "2026/04/14", "conds": ["3"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/14", "c": ["3"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "8431.0", "name": "明達醫", "ind": "未分類", "price": 100.78, "latest": "2026/04/15", "conds": ["1", "2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1", "2"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "3485.0", "name": "敘豐", "ind": "光電業", "price": 310.56, "latest": "2026/04/13", "conds": ["3"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/10", "c": ["3"], "a": true, "b": true}, {"d": "04/13", "c": ["3"], "a": true, "b": true}, {"d": "04/14", "c": ["3"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}], "n30": 4, "disp": false}, {"code": "6586.0", "name": "醣基", "ind": "生技醫療業", "price": 48.3, "latest": "2026/04/15", "conds": ["1", "2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1", "2"], "a": true, "b": true}, {"d": "04/16", "c": ["2", "4"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "6673.0", "name": "和詮", "ind": "光電業", "price": 19.14, "latest": "2026/04/15", "conds": ["1", "2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1", "2", "4"], "a": true, "b": true}, {"d": "04/16", "c": ["1", "2", "4"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "6883.0", "name": "微電能源", "ind": "綠能環保", "price": 18.08, "latest": "2026/04/16", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/16", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "6891.0", "name": "樂迦再生", "ind": "未分類", "price": 47.13, "latest": "2026/04/16", "conds": ["2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/16", "c": ["2"], "a": true, "b": true}], "n30": 1, "disp": false}, {"code": "6915.0", "name": "美強光", "ind": "電子零組件業", "price": 37.9, "latest": "2026/04/15", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1"], "a": false, "b": false}, {"d": "04/16", "c": ["2"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "7590.0", "name": "怡和國際", "ind": "數位雲端", "price": 20.84, "latest": "2026/04/16", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/16", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "7851.0", "name": "慧康生技*-KY", "ind": "生技醫療業", "price": 38.89, "latest": "2026/04/16", "conds": ["2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/16", "c": ["2"], "a": true, "b": true}], "n30": 1, "disp": false}, {"code": "7772.0", "name": "耀穎", "ind": "半導體業", "price": 155.64, "latest": "2026/04/15", "conds": ["2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/10", "c": ["1"], "a": false, "b": false}, {"d": "04/14", "c": ["2"], "a": true, "b": true}, {"d": "04/15", "c": ["2"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "4537.0", "name": "旭東", "ind": "光電業", "price": 146.86, "latest": "2026/04/13", "conds": ["2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/13", "c": ["2"], "a": true, "b": true}, {"d": "04/14", "c": ["2"], "a": true, "b": true}], "n30": 2, "disp": false}, {"code": "6407.0", "name": "相互", "ind": "未分類", "price": 46.09, "latest": "2026/04/15", "conds": ["2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/13", "c": ["4"], "a": false, "b": true}, {"d": "04/14", "c": ["2", "4"], "a": true, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "6868.0", "name": "采威國際", "ind": "資訊服務業", "price": 37.5, "latest": "2026/04/14", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/14", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "7843.0", "name": "英柏得", "ind": "未分類", "price": 107.27, "latest": "2026/04/14", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/14", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "7868.0", "name": "聖育", "ind": "資訊服務業", "price": 104.57, "latest": "2026/04/15", "conds": ["2", "4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/13", "c": ["1"], "a": false, "b": false}, {"d": "04/14", "c": ["4"], "a": false, "b": true}, {"d": "04/15", "c": ["2", "4"], "a": true, "b": true}], "n30": 3, "disp": false}, {"code": "7872.0", "name": "登豐", "ind": "半導體業", "price": 73.73, "latest": "2026/04/13", "conds": ["4"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/13", "c": ["4"], "a": false, "b": true}, {"d": "04/14", "c": ["4"], "a": false, "b": true}], "n30": 2, "disp": false}, {"code": "6959.0", "name": "兆捷科技", "ind": "化學工業", "price": 111.1, "latest": "2026/04/13", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/13", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "3603.0", "name": "建祥國際", "ind": "電子通路業", "price": 10.57, "latest": "2026/04/15", "conds": ["1"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1"], "a": false, "b": false}], "n30": 1, "disp": false}, {"code": "8119.0", "name": "公信", "ind": "未分類", "price": 13.95, "latest": "2026/04/15", "conds": ["1", "2"], "rA": 0, "rB": 0, "rem": 3, "tl": [{"d": "04/15", "c": ["1", "2"], "a": true, "b": true}], "n30": 1, "disp": false}], "recent_disposals": [{"code": "3585.0", "name": "聯致", "date": "2026/04/16", "reason": "連續3個營業日"}, {"code": "7763.0", "name": "崇舜", "date": "2026/04/16", "reason": "連續3個營業日"}, {"code": "7887.0", "name": "宇川精材", "date": "2026/04/16", "reason": "連續3個營業日"}, {"code": "3485.0", "name": "敘豐", "date": "2026/04/14", "reason": "連續3個營業日"}, {"code": "4573.0", "name": "高明鐵", "date": "2026/04/14", "reason": "連續3個營業日"}, {"code": "6920.0", "name": "恆勁科技", "date": "2026/04/14", "reason": "連續3個營業日"}, {"code": "7853.0", "name": "政美應用", "date": "2026/04/14", "reason": "連續3個營業日"}, {"code": "7825.0", "name": "和亞智慧", "date": "2026/04/13", "reason": "最近6個營業日內有4個營業日"}, {"code": "7419.0", "name": "達勝", "date": "2026/04/08", "reason": "連續3個營業日"}, {"code": "6820.0", "name": "連訊", "date": "2026/04/01", "reason": "最近6個營業日內有4個營業日"}, {"code": "6559.0", "name": "研晶", "date": "2026/03/25", "reason": "連續3個營業日"}, {"code": "7815.0", "name": "新特", "date": "2026/03/25", "reason": "連續3個營業日"}, {"code": "7858.0", "name": "芝普", "date": "2026/03/25", "reason": "最近6個營業日內有4個營業日"}, {"code": "3595.0", "name": "山太士", "date": "2026/03/23", "reason": "連續3個營業日"}, {"code": "5297.0", "name": "廣化", "date": "2026/03/23", "reason": "最近6個營業日內有4個營業日"}, {"code": "6990.0", "name": "華鉬", "date": "2026/03/23", "reason": "連續3個營業日"}, {"code": "7742.0", "name": "天弘化", "date": "2026/03/23", "reason": "連續3個營業日"}, {"code": "4573.0", "name": "高明鐵", "date": "2026/03/20", "reason": "最近6個營業日內有4個營業日"}, {"code": "7853.0", "name": "政美應用", "date": "2026/03/20", "reason": "連續3個營業日"}, {"code": "7866.0", "name": "丹立", "date": "2026/03/19", "reason": "連續3個營業日"}, {"code": "3595.0", "name": "山太士", "date": "2026/03/17", "reason": "連續3個營業日"}, {"code": "5246.0", "name": "勵威", "date": "2026/03/17", "reason": "最近6個營業日內有4個營業日"}, {"code": "6983.0", "name": "華洋精機", "date": "2026/03/17", "reason": "連續3個營業日"}, {"code": "7419.0", "name": "達勝", "date": "2026/03/13", "reason": "最近6個營業日內有4個營業日"}]};
+
+const condName = {'1':'一','2':'二','3':'三','4':'四'};
+const condClass = {'1':'cond-1','2':'cond-2','3':'cond-3','4':'cond-4'};
+
+// 計算處置起訖時間（公布日隔天起算5個營業日）
+function calcDisposalPeriod(announceDateStr) {
+  // announceDateStr: "2026/03/25" 格式
+  const parts = announceDateStr.split('/');
+  const d = new Date(+parts[0], +parts[1]-1, +parts[2]);
+  // 起始日 = 公布日的下一個營業日
+  const start = nextBizDay(d);
+  // 結束日 = 起始日起算第5個營業日
+  let end = new Date(start);
+  let count = 1;
+  while (count < 5) {
+    end.setDate(end.getDate() + 1);
+    if (isBizDay(end)) count++;
+  }
+  return formatDate(start) + '~' + formatDate(end);
+}
+function nextBizDay(d) {
+  const next = new Date(d);
+  next.setDate(next.getDate() + 1);
+  while (!isBizDay(next)) next.setDate(next.getDate() + 1);
+  return next;
+}
+function isBizDay(d) {
+  const dow = d.getDay();
+  return dow !== 0 && dow !== 6; // 排除週末，國定假日需手動維護
+}
+function formatDate(d) {
+  const y = d.getFullYear() - 1911; // 民國年
+  return y + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
+}
+
+// 為每筆處置紀錄計算起訖時間
+DATA.recent_disposals.forEach(d => {
+  d.period = calcDisposalPeriod(d.date);
+});
+
+// === 修正 rA/rB：從 timeline 重新計算真正的連續營業日 ===
+// 1. 先建立所有已知營業日集合（從所有股票的 timeline 收集）
+const allBizDates = new Set();
+DATA.stocks.forEach(s => {
+  s.tl.forEach(t => allBizDates.add(t.d)); // "MM/DD" 格式
+});
+const sortedBizDates = [...allBizDates].sort();
+
+// 2. 判斷兩個日期是否為「相鄰營業日」（中間沒有其他已知營業日）
+function areConsecutiveBizDays(d1, d2) {
+  const idx1 = sortedBizDates.indexOf(d1);
+  const idx2 = sortedBizDates.indexOf(d2);
+  return idx1 >= 0 && idx2 >= 0 && idx2 === idx1 + 1;
+}
+
+// 3. 重新計算每檔股票的 rA（連續②③款）和 rB（6日內4日②③④款）
+DATA.stocks.forEach(s => {
+  // 規則A：計算最大連續天數（僅計 a=true 的日期，且日期必須相鄰營業日）
+  let maxConsecA = 0, curConsecA = 0;
+  const aDays = s.tl.filter(t => t.a).map(t => t.d);
+  for (let i = 0; i < aDays.length; i++) {
+    if (i === 0) {
+      curConsecA = 1;
+    } else if (areConsecutiveBizDays(aDays[i-1], aDays[i])) {
+      curConsecA++;
+    } else {
+      curConsecA = 1; // 中斷，歸零重算
+    }
+    maxConsecA = Math.max(maxConsecA, curConsecA);
+  }
+  // 取最近一段連續（從最後一天往回看）
+  let tailConsecA = 0;
+  for (let i = aDays.length - 1; i >= 0; i--) {
+    if (i === aDays.length - 1) {
+      tailConsecA = 1;
+    } else if (areConsecutiveBizDays(aDays[i], aDays[i+1])) {
+      tailConsecA++;
+    } else {
+      break;
+    }
+  }
+  s.rA = tailConsecA; // 使用最近一段連續天數（這才是處置判斷的依據）
+
+  // 規則B：最近6個營業日內有幾個營業日被注意（b=true）
+  const bDays = s.tl.filter(t => t.b).map(t => t.d);
+  if (bDays.length > 0) {
+    const lastBDay = bDays[bDays.length - 1];
+    const lastIdx = sortedBizDates.indexOf(lastBDay);
+    // 往回找6個營業日的範圍
+    const windowStart = Math.max(0, lastIdx - 5);
+    const windowDates = sortedBizDates.slice(windowStart, lastIdx + 1);
+    s.rB = bDays.filter(d => windowDates.includes(d)).length;
+  } else {
+    s.rB = 0;
+  }
+
+  // 重新計算 rem（距離處置的剩餘次數）
+  const remA = Math.max(0, 3 - s.rA);
+  const remB = Math.max(0, 4 - s.rB);
+  s.rem = Math.min(remA, remB);
+});
+
+// 修正 disp 標籤：根據 recent_disposals 是否有紀錄來判斷
+DATA.stocks.forEach(s => {
+  const dispRecords = DATA.recent_disposals.filter(d => d.code === s.code);
+  s.disp = dispRecords.length > 0;
+});
+
+// 重新計算統計數字
+DATA.risk0 = DATA.stocks.filter(s => s.rem === 0).length;
+DATA.risk1 = DATA.stocks.filter(s => s.rem === 1).length;
+DATA.risk2 = DATA.stocks.filter(s => s.rem === 2).length;
+document.getElementById('sRisk0').textContent = DATA.risk0;
+document.getElementById('sRisk1').textContent = DATA.risk1;
+document.getElementById('sRisk2').textContent = DATA.risk2;
+
+document.getElementById('updateDate').textContent = DATA.date;
+document.getElementById('sRisk0').textContent = DATA.risk0;
+document.getElementById('sRisk1').textContent = DATA.risk1;
+document.getElementById('sRisk2').textContent = DATA.risk2;
+document.getElementById('sTotal').textContent = DATA.total_stocks;
+document.getElementById('sDisp').textContent = DATA.recent_disposals.length;
+
+// Recent disposals
+let dhtml = '<div style="margin-bottom:8px;font-size:14px;font-weight:700;color:#f85149">近期處置紀錄</div><div class="recent-disp">';
+DATA.recent_disposals.forEach(d => {
+  dhtml += `<div class="disp-card"><span class="d-name">${d.code.replace('.0','')} ${d.name}</span> <span class="d-date">${d.date}</span><br><span class="d-reason">${d.reason}</span></div>`;
+});
+dhtml += '</div>';
+document.getElementById('recentDisp').innerHTML = dhtml;
+
+function renderStocks(filter) {
+  let stocks = DATA.stocks;
+
+  const groups = [
+    {rem: 0, title: '已達處置標準', cls: 'risk-0', stocks: stocks.filter(s => s.rem === 0)},
+    {rem: 1, title: '差1次就處置', cls: 'risk-1', stocks: stocks.filter(s => s.rem === 1)},
+    {rem: 2, title: '差2次處置', cls: 'risk-2', stocks: stocks.filter(s => s.rem === 2)},
+    {rem: 99, title: '暫時安全（差3次以上）', cls: 'risk-2', stocks: stocks.filter(s => s.rem > 2)}
+  ];
+
+  let html = '';
+  groups.forEach(g => {
+    if (filter !== 'all') {
+      if (filter === 'safe' && g.rem < 3) return;
+      if (filter !== 'safe' && g.rem !== filter) return;
+    }
+    if (g.stocks.length === 0) return;
+
+    html += `<div class="section ${g.cls}">`;
+    html += `<div class="section-title"><span class="dot"></span>${g.title} (${g.stocks.length} 檔)</div>`;
+    html += `<table class="stock-table"><tr>
+      <th>代號</th><th style="text-align:left">名稱</th><th>產業</th><th>收盤價</th>
+      <th>最新注意日</th><th>觸發條款</th>
+      <th><span class="rule-box rule-a">規則A</span><br>連3日②③款</th>
+      <th><span class="rule-box rule-b">規則B</span><br>6日4日②③④款</th>
+      <th>處置時間</th><th>風險等級</th><th>30日注意軌跡</th>
+    </tr>`;
+
+    g.stocks.forEach(s => {
+      const code = s.code.replace('.0','');
+      const condsHtml = s.conds.map(c => `<span class="cond-tag ${condClass[c]}">第${condName[c]}款</span>`).join('');
+
+      // 條款對應顏色
+      const condColor = {'2':'#d29922','3':'#58a6ff','4':'#f85149'};
+
+      // 根據條款生成圓點顏色（多條款用漸層）
+      function dotStyle(conds) {
+        const colors = conds.map(c => condColor[c]).filter(Boolean);
+        if (colors.length === 0) return 'background:#8b949e';
+        if (colors.length === 1) return 'background:' + colors[0];
+        // 多色漸層
+        const pct = 100 / colors.length;
+        const stops = colors.map((c, i) => `${c} ${i*pct}%, ${c} ${(i+1)*pct}%`).join(', ');
+        return 'background:linear-gradient(135deg,' + stops + ')';
+      }
+
+      // Rule A progress dots（含 tooltip + 條款顏色）
+      const aEntries = s.tl.filter(t => t.a);
+      const recentAEntries = aEntries.slice(-s.rA);
+      let raDots = '';
+      for(let i = 0; i < 3; i++) {
+        if (i < s.rA) {
+          const entry = recentAEntries[i];
+          const relevantConds = entry.c.filter(c => c === '2' || c === '3'); // 規則A只計②③
+          const tip = entry.d + ': 第' + relevantConds.map(c => condName[c]).join(',') + '款';
+          const bg = dotStyle(relevantConds);
+          const dangerBorder = s.rA >= 3 ? 'box-shadow:0 0 0 2px #f85149;animation:pulse 1s infinite;' : '';
+          raDots += `<span class="progress-dot" title="${tip}" style="cursor:pointer;${bg};${dangerBorder}"></span>`;
+        } else {
+          raDots += `<span class="progress-dot dot-empty"></span>`;
+        }
+      }
+
+      // Rule B progress dots（含 tooltip + 條款顏色）
+      const bEntries = s.tl.filter(t => t.b);
+      const lastBDay = bEntries.length > 0 ? bEntries[bEntries.length-1].d : null;
+      const lastBIdx = lastBDay ? sortedBizDates.indexOf(lastBDay) : -1;
+      const windowDates = lastBIdx >= 0 ? sortedBizDates.slice(Math.max(0, lastBIdx-5), lastBIdx+1) : [];
+      const recentBEntries = bEntries.filter(e => windowDates.includes(e.d));
+      let rbDots = '';
+      for(let i = 0; i < 4; i++) {
+        if (i < s.rB && recentBEntries[i]) {
+          const entry = recentBEntries[i];
+          const relevantConds = entry.c.filter(c => c === '2' || c === '3' || c === '4'); // 規則B計②③④
+          const tip = entry.d + ': 第' + relevantConds.map(c => condName[c]).join(',') + '款';
+          const bg = dotStyle(relevantConds);
+          const dangerBorder = s.rB >= 4 ? 'box-shadow:0 0 0 2px #f85149;animation:pulse 1s infinite;' : '';
+          rbDots += `<span class="progress-dot" title="${tip}" style="cursor:pointer;${bg};${dangerBorder}"></span>`;
+        } else {
+          rbDots += `<span class="progress-dot dot-empty"></span>`;
+        }
+      }
+
+      // Timeline
+      let tlHtml = '<div class="timeline">';
+      s.tl.forEach(t => {
+        let cls = 'tl-none';
+        let tip = t.d + ': 第' + t.c.map(c => condName[c]).join(',') + '款';
+        if (t.a && t.b) cls = 'tl-has2344';
+        else if (t.b) cls = 'tl-has234';
+        else if (t.a) cls = 'tl-has23';
+        else cls = 'tl-only1';
+        tlHtml += `<span class="tl-dot ${cls}" data-tip="${tip}"></span>`;
+      });
+      tlHtml += '</div>';
+
+      // Risk badge
+      let badge = '';
+      if (s.rem === 0) badge = `<span class="risk-badge badge-danger">已達標</span>`;
+      else if (s.rem === 1) badge = `<span class="risk-badge badge-warning">差1次</span>`;
+      else if (s.rem === 2) badge = `<span class="risk-badge badge-info">差2次</span>`;
+      else badge = `<span class="risk-badge badge-safe">安全</span>`;
+
+      // 判斷是否正在處置中（檢查所有處置紀錄的結束日期）
+      if (s.disp) {
+        const sDispRecords = DATA.recent_disposals.filter(d => d.code === s.code);
+        const today = new Date();
+        let isActive = false;
+        sDispRecords.forEach(d => {
+          if (d.period) {
+            const endStr = d.period.split('~')[1];
+            if (endStr) {
+              const ep = endStr.split('/');
+              const endDate = new Date(+ep[0]+1911, +ep[1]-1, +ep[2]);
+              if (endDate >= today) isActive = true;
+            }
+          }
+        });
+        if (isActive) {
+          badge += ` <span class="disposed-tag" style="background:#f8514944;border:1px solid #f85149;animation:pulse 2s infinite">處置中</span>`;
+        } else {
+          badge += ` <span class="disposed-tag" style="background:#8b949e22;color:#8b949e;border:1px solid #8b949e55">處置結束</span>`;
+        }
+      }
+
+      // 處置時間（從 recent_disposals 查找該股票所有處置紀錄，含起訖時間）
+      const dispRecords = DATA.recent_disposals.filter(d => d.code === s.code);
+      let dispHtml = '<span style="color:#8b949e">-</span>';
+      if (dispRecords.length > 0) {
+        dispHtml = dispRecords.map(d => {
+          const today = new Date();
+          // 解析結束日期判斷是否仍在處置期間
+          const endStr = d.period.split('~')[1];
+          const endParts = endStr ? endStr.split('/') : [];
+          const endDate = endParts.length === 3 ? new Date(+endParts[0]+1911, +endParts[1]-1, +endParts[2]) : null;
+          const isActive = endDate && endDate >= today;
+          const statusTag = isActive
+            ? '<span style="color:#f85149;font-size:10px;font-weight:700">處置中</span>'
+            : '<span style="color:#8b949e;font-size:10px">已結束</span>';
+          return `<div style="font-size:11px;margin:2px 0;padding:3px 0;border-bottom:1px solid #21262d"><span style="color:#d29922;font-weight:600">${d.period}</span> ${statusTag}<br><span style="color:#8b949e;font-size:10px">${d.reason}</span></div>`;
+        }).join('');
+      }
+
+      html += `<tr>
+        <td><span class="stock-code">${code}</span></td>
+        <td class="stock-name">${s.name}</td>
+        <td style="font-size:11px;color:#8b949e">${s.ind}</td>
+        <td style="font-weight:600">${s.price > 0 ? s.price.toFixed(1) : '-'}</td>
+        <td>${s.latest}</td>
+        <td>${condsHtml}</td>
+        <td><div class="progress-bar">${raDots}</div><div style="font-size:10px;color:#8b949e;margin-top:2px">${s.rA}/3</div></td>
+        <td><div class="progress-bar">${rbDots}</div><div style="font-size:10px;color:#8b949e;margin-top:2px">${s.rB}/4</div></td>
+        <td>${dispHtml}</td>
+        <td>${badge}</td>
+        <td>${tlHtml}</td>
+      </tr>`;
+    });
+
+    html += '</table></div>';
+  });
+
+  document.getElementById('stockSections').innerHTML = html;
+}
+
+function filterStocks(f) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderStocks(f);
+}
+
+renderStocks('all');
+
+// === 即時股價爬蟲功能 ===
+async function fetchAllPrices() {
+  const btn = document.getElementById('fetchPriceBtn');
+  const status = document.getElementById('priceStatus');
+  btn.disabled = true;
+  btn.textContent = '抓取中...';
+  btn.style.opacity = '0.5';
+  status.textContent = '';
+
+  // 使用 Yahoo Finance API（24小時可用，含盤後收盤價）
+  const PROXY = url => 'https://corsproxy.io/?' + encodeURIComponent(url);
+  let updated = 0;
+  let failed = 0;
+
+  // 逐檔抓取（Yahoo Finance 不支援批次查詢）
+  // 用 Promise 並行控制，每次同時抓 5 檔
+  const concurrency = 5;
+  const stocks = [...DATA.stocks];
+
+  for (let i = 0; i < stocks.length; i += concurrency) {
+    const batch = stocks.slice(i, i + concurrency);
+    const promises = batch.map(async (stock) => {
+      const code = stock.code.replace('.0', '');
+      const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.TWO?range=1d&interval=1d`;
+      try {
+        const resp = await fetch(PROXY(yahooUrl), {signal: AbortSignal.timeout(10000)});
+        const json = await resp.json();
+        const meta = json.chart?.result?.[0]?.meta;
+        if (meta && meta.regularMarketPrice) {
+          const price = meta.regularMarketPrice;
+          const prevClose = meta.chartPreviousClose || 0;
+          stock.price = price;
+          stock.prevClose = prevClose;
+          stock.priceChange = prevClose > 0 ? ((price - prevClose) / prevClose * 100).toFixed(2) : null;
+          updated++;
+        } else {
+          failed++;
+        }
+      } catch (e) {
+        console.error('Fetch failed for', code, e);
+        failed++;
+      }
+    });
+    await Promise.all(promises);
+    status.textContent = `抓取中... ${Math.min(i + concurrency, stocks.length)}/${stocks.length}`;
+    // 間隔避免被擋
+    if (i + concurrency < stocks.length) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  // 更新顯示
+  renderStocks(getCurrentFilter());
+
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+  status.textContent = `✓ ${timeStr} 更新 ${updated} 檔`;
+  if (failed > 0) status.textContent += ` (${failed} 檔失敗)`;
+  status.style.color = failed > 0 ? '#d29922' : '#3fb950';
+
+  btn.disabled = false;
+  btn.textContent = '即時更新股價';
+  btn.style.opacity = '1';
+}
+
+function getCurrentFilter() {
+  const active = document.querySelector('.filter-btn.active');
+  if (!active) return 'all';
+  const text = active.textContent;
+  if (text.includes('已達')) return 0;
+  if (text.includes('差1')) return 1;
+  if (text.includes('差2')) return 2;
+  if (text.includes('安全')) return 'safe';
+  return 'all';
+}
+
+// 修改價格顯示，加入漲跌幅
+const origRender = renderStocks;
+renderStocks = function(filter) {
+  origRender(filter);
+  // 在渲染後，替換有漲跌幅的股票價格顯示
+  document.querySelectorAll('.stock-table tbody tr, .stock-table tr').forEach(tr => {
+    const cells = tr.querySelectorAll('td');
+    if (cells.length < 4) return;
+    const nameCell = cells[1];
+    const priceCell = cells[3];
+    const name = nameCell ? nameCell.textContent.trim() : '';
+    const stock = DATA.stocks.find(s => s.name === name);
+    if (stock && stock.priceChange !== undefined && stock.priceChange !== null) {
+      const change = parseFloat(stock.priceChange);
+      const color = change > 0 ? '#f85149' : change < 0 ? '#3fb950' : '#8b949e';
+      const sign = change > 0 ? '+' : '';
+      priceCell.innerHTML = `<span style="font-weight:600">${stock.price.toFixed(1)}</span><br><span style="font-size:11px;color:${color}">${sign}${stock.priceChange}%</span>`;
+    }
+  });
+};
+
+// 頁面載入自動抓一次
+fetchAllPrices();
+</script>
+</body>
+</html>

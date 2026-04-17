@@ -1,0 +1,74 @@
+name: Update TPEx Data
+
+on:
+  schedule:
+    # 每個工作日 UTC 10:30 = Asia/Taipei 18:30
+    - cron: '30 10 * * 1-5'
+  # 允許手動觸發
+  workflow_dispatch:
+
+# 給予寫入權限，才能 commit 更新後的 HTML
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright openpyxl
+          playwright install chromium --with-deps
+
+      - name: Run scraper
+        run: python scrape_tpex.py
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - name: Commit & push updated HTML
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto update: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
+
+  # 獨立 job：部署到 GitHub Pages
+  deploy:
+    needs: scrape
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout (latest)
+        uses: actions/checkout@v4
+        with:
+          ref: main  # 拿到最新的 commit（含剛推的資料）
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
