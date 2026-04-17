@@ -114,12 +114,21 @@ body{font-family:'Segoe UI','Microsoft JhengHei',sans-serif;background:#0d1117;c
 
   <div id="recentDisp"></div>
 
-  <div class="filter-row">
+  <div class="filter-row" style="align-items:center">
     <button class="filter-btn active" onclick="filterStocks('all')">全部</button>
     <button class="filter-btn" onclick="filterStocks(0)">已達標準</button>
     <button class="filter-btn" onclick="filterStocks(1)">差1次</button>
     <button class="filter-btn" onclick="filterStocks(2)">差2次</button>
     <button class="filter-btn" onclick="filterStocks('safe')">暫時安全</button>
+    <div style="flex:1"></div>
+    <div style="position:relative;display:inline-flex;align-items:center">
+      <span style="position:absolute;left:10px;color:#8b949e;font-size:14px;pointer-events:none">🔍</span>
+      <input id="searchBox" type="text" placeholder="搜尋代號或名稱..." oninput="handleSearch(this.value)"
+        style="padding:6px 30px 6px 32px;border-radius:16px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-size:12px;width:220px;outline:none"
+        onfocus="this.style.borderColor='#58a6ff'" onblur="this.style.borderColor='#30363d'">
+      <span id="searchClear" onclick="clearSearch()" style="position:absolute;right:10px;color:#8b949e;cursor:pointer;font-size:14px;display:none">✕</span>
+    </div>
+    <span id="searchCount" style="font-size:12px;color:#8b949e;margin-left:4px"></span>
   </div>
 
   <div id="stockSections"></div>
@@ -258,8 +267,20 @@ DATA.recent_disposals.forEach(d => {
 dhtml += '</div>';
 document.getElementById('recentDisp').innerHTML = dhtml;
 
+let currentSearch = '';
+
 function renderStocks(filter) {
   let stocks = DATA.stocks;
+
+  // 搜尋過濾（代號/名稱，不分大小寫）
+  if (currentSearch) {
+    const q = currentSearch.toLowerCase();
+    stocks = stocks.filter(s => {
+      const code = s.code.replace('.0','').toLowerCase();
+      const name = (s.name || '').toLowerCase();
+      return code.includes(q) || name.includes(q);
+    });
+  }
 
   const groups = [
     {rem: 0, title: '已達處置標準', cls: 'risk-0', stocks: stocks.filter(s => s.rem === 0)},
@@ -268,7 +289,26 @@ function renderStocks(filter) {
     {rem: 99, title: '暫時安全（差3次以上）', cls: 'risk-2', stocks: stocks.filter(s => s.rem > 2)}
   ];
 
+  // 更新搜尋結果數
+  const cntEl = document.getElementById('searchCount');
+  if (cntEl) {
+    if (currentSearch) {
+      const total = stocks.length;
+      cntEl.textContent = `找到 ${total} 檔`;
+      cntEl.style.color = total > 0 ? '#3fb950' : '#f85149';
+    } else {
+      cntEl.textContent = '';
+    }
+  }
+
   let html = '';
+  if (currentSearch && stocks.length === 0) {
+    html = `<div style="text-align:center;padding:60px;color:#8b949e;background:#161b22;border:1px solid #30363d;border-radius:10px">
+      <div style="font-size:40px;margin-bottom:10px">🔍</div>
+      <div>找不到代號或名稱含「${currentSearch}」的股票</div>
+    </div>`;
+  }
+
   groups.forEach(g => {
     if (filter !== 'all') {
       if (filter === 'safe' && g.rem < 3) return;
@@ -422,11 +462,40 @@ function renderStocks(filter) {
   document.getElementById('stockSections').innerHTML = html;
 }
 
+let currentFilter = 'all';
+
 function filterStocks(f) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
+  currentFilter = f;
   renderStocks(f);
 }
+
+// 搜尋處理（含 debounce）
+let searchTimer = null;
+function handleSearch(value) {
+  clearTimeout(searchTimer);
+  const clearBtn = document.getElementById('searchClear');
+  if (clearBtn) clearBtn.style.display = value ? 'inline' : 'none';
+  searchTimer = setTimeout(() => {
+    currentSearch = value.trim();
+    renderStocks(currentFilter);
+  }, 150);
+}
+
+function clearSearch() {
+  const box = document.getElementById('searchBox');
+  if (box) box.value = '';
+  currentSearch = '';
+  document.getElementById('searchClear').style.display = 'none';
+  renderStocks(currentFilter);
+  if (box) box.focus();
+}
+
+// 支援 Esc 鍵清除搜尋
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.activeElement?.id === 'searchBox') clearSearch();
+});
 
 renderStocks('all');
 
