@@ -300,73 +300,31 @@ let currentSearch = '';
 //   1. 評估明日「若被注意」會不會直接觸發處置
 //   2. 用歷史閾值估算明日收盤價需到多少才會觸發②③④款
 function computeTomorrowPrediction(s) {
-  if (s.disp) {
-    // 已在處置中 / 已處置結束
-    return '<span style="color:#8b949e;font-size:11px">-</span>';
-  }
+  if (s.disp || s.price <= 0) return '<span style="color:#8b949e;font-size:11px">-</span>';
 
   const code = s.code.replace('.0', '');
   const thresh = THRESHOLDS[code] || {};
+  const triggers = [];
 
-  // 預測：明天若被②③款注意，規則A會變成 rA+1
-  // 若被②③④款注意，規則B會變成 rB+1 (可能是 +1 或維持，若6日窗口往前滾導致最前面的日被剔除)
-  const rA_next_ifHit = s.rA + 1;  // 明天被②③注意
-  const rA_next_ifMiss = 0;  // 沒被注意 → 歸零
-  // 規則B 明天若被注意：先看6日窗內是否會丟掉最前面那天，若最前面那天=第6天，就會剔除
-  // 簡化：假設 rB_next_ifHit = min(rB + 1, 4)
-  const rB_next_ifHit = Math.min(s.rB + 1, 4);
-  const rB_next_ifMiss = Math.max(s.rB - 1, 0);  // 窗口前移，最前面可能被剔除
-
-  let status = '';
-  let priceInfo = '';
-
-  // ------- 風險評估 -------
-  if (rA_next_ifHit >= 3 || rB_next_ifHit >= 4) {
-    // 🔴 明日若被注意 → 直接處置！
-    status = `<div style="color:#f85149;font-weight:700;font-size:11px">🔴 明日若再被②③${rB_next_ifHit >= 4 ? '④' : ''}款注意<br>→ <span style="text-decoration:underline">進入處置</span></div>`;
-  } else if (s.rA === 2 || s.rB === 3) {
-    status = `<div style="color:#d29922;font-weight:600;font-size:11px">🟡 再${Math.max(3-s.rA, 4-s.rB)}次注意就處置</div>`;
-  } else if (s.rA >= 1 || s.rB >= 2) {
-    status = `<div style="color:#58a6ff;font-size:11px">🔵 累積中 (rA:${s.rA}→${rA_next_ifHit}, rB:${s.rB}→${rB_next_ifHit})</div>`;
-  } else {
-    status = `<div style="color:#3fb950;font-size:11px">✅ 暫時安全</div>`;
+  // 第二款（5日累積漲幅）
+  if (thresh['2'] && thresh['2'].up_min) {
+    const t = thresh['2'].up_min;
+    const rise = t / 5;
+    const price = s.price * (1 + rise / 100);
+    triggers.push(`<div style="font-size:11px;color:#d29922;white-space:nowrap">② ↑${rise.toFixed(1)}% → ${price.toFixed(1)}</div>`);
   }
 
-  // ------- 明日觸發價預估 -------
-  // 只對差1-2次的股票計算，其他沒必要顯示
-  if (s.rem <= 2 && s.price > 0) {
-    const triggers = [];
-
-    // 第二款（5日累積漲幅）
-    if (thresh['2'] && thresh['2'].up_min) {
-      // 用該股最低歷史觸發閾值作為最敏感估計
-      const t = thresh['2'].up_min;
-      // 簡化模型：若目前價是5日前的P0，累積漲幅=G0
-      // 明日需達 P_tmr 使 (P_tmr / P_-4) - 1 > t/100
-      // 缺5日前收盤，改用：今日若再漲 X% 就會觸發，X = t - (current 5d gain)
-      // 保守估計：明日只要從今日收盤再漲 t/5 就有機會觸發（因為5日窗口前移）
-      const triggerRise = t / 5;  // 粗估
-      const triggerPrice = s.price * (1 + triggerRise / 100);
-      triggers.push(`<div style="font-size:10px;color:#d29922">②:↑${triggerRise.toFixed(1)}%→${triggerPrice.toFixed(1)}</div>`);
-    }
-
-    // 第四款（30日累積漲幅100%）
-    if (thresh['4'] && thresh['4'].up_min) {
-      const t = thresh['4'].up_min;
-      const triggerRise = t / 30;
-      const triggerPrice = s.price * (1 + triggerRise / 100);
-      triggers.push(`<div style="font-size:10px;color:#f85149">④:↑${triggerRise.toFixed(1)}%→${triggerPrice.toFixed(1)}</div>`);
-    }
-
-    if (triggers.length > 0) {
-      priceInfo = `<div style="margin-top:4px;padding-top:4px;border-top:1px solid #30363d">
-        <div style="font-size:9px;color:#8b949e;margin-bottom:2px">預估觸發價</div>
-        ${triggers.join('')}
-      </div>`;
-    }
+  // 第四款（30日累積漲幅）
+  if (thresh['4'] && thresh['4'].up_min) {
+    const t = thresh['4'].up_min;
+    const rise = t / 30;
+    const price = s.price * (1 + rise / 100);
+    triggers.push(`<div style="font-size:11px;color:#f85149;white-space:nowrap">④ ↑${rise.toFixed(1)}% → ${price.toFixed(1)}</div>`);
   }
 
-  return status + priceInfo;
+  return triggers.length > 0
+    ? `<div style="line-height:1.6">${triggers.join('')}</div>`
+    : '<span style="color:#8b949e;font-size:11px">-</span>';
 }
 
 function renderStocks(filter) {
